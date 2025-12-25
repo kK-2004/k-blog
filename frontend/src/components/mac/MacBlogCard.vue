@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watchEffect } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import type { Post } from '@/data/initialPosts'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import { useReadStats } from '@/composables/useReadStats'
@@ -24,14 +24,27 @@ const props = defineProps<{
 
 const COLLAPSED_MAX_HEIGHT = 600
 const EXPANDED_MAX_HEIGHT = 770
+const EXPAND_COLLAPSE_MS = 520
+const SUMMARY_COLLAPSE_MS = 360
 
 const COLLAPSED_INNER_MAX_HEIGHT = 400
 
 const isExpanded = ref(false)
+const isVisuallyExpanded = ref(false)
 const replyingTo = ref<number | null>(null)
 const inputRef = ref<HTMLElement | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
-let centerScrollTimer: number | null = null
+const scrollerRef = ref<HTMLElement | null>(null)
+let centerScrollRaf = 0
+let centerScrollStopAt = 0
+let isCenteringScroll = false
+let ignoreAutoCollapseUntil = 0
+let centerScrollUserInterrupted = false
+
+const interruptCenterScroll = () => {
+  centerScrollUserInterrupted = true
+  stopCenterScroll()
+}
 
 const draftUser = ref('')
 const draftText = ref('')
@@ -50,10 +63,11 @@ const showExpandBtn = computed(() => {
   return text.length > 100 || text.includes('```') || Boolean(props.post.hotComment)
 })
 
-const hotComment = computed(() => props.post.hotComment)
-
 watchEffect(() => {
-  if (!showExpandBtn.value) isExpanded.value = true
+  if (!showExpandBtn.value) {
+    isExpanded.value = true
+    isVisuallyExpanded.value = true
+  }
 })
 
 watchEffect(() => {
@@ -78,6 +92,8 @@ watchEffect(() => {
 
 const readStats = useReadStats(computed(() => props.post.content))
 
+const EXPAND_EVENT = 'mac-blog-card:expand'
+
 const getFixedHeaderHeight = () => {
   const header = document.querySelector('header')
   if (!header) return 0
@@ -86,39 +102,103 @@ const getFixedHeaderHeight = () => {
   return isFixed ? rect.height : 0
 }
 
-const scrollCardToCenter = async (opts?: { afterExpandAnimation?: boolean }) => {
-  if (centerScrollTimer) window.clearTimeout(centerScrollTimer)
+const getCardTargetScrollY = () => {
+  const el = cardRef.value
+  if (!el) return null
 
-  const delay = opts?.afterExpandAnimation ? 520 : 0
-  centerScrollTimer = window.setTimeout(async () => {
-    await nextTick()
-    const el = cardRef.value
-    if (!el) return
+  const headerHeight = getFixedHeaderHeight()
+  const rect = el.getBoundingClientRect()
+  const viewportCenterY = headerHeight + (window.innerHeight - headerHeight) / 2
+  const elementCenterY = rect.top + rect.height / 2
+  const targetY = window.scrollY + (elementCenterY - viewportCenterY)
+  const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+  return Math.min(maxScrollY, Math.max(0, targetY))
+}
 
-    const headerHeight = getFixedHeaderHeight()
-    const rect = el.getBoundingClientRect()
-    const viewportCenterY = headerHeight + (window.innerHeight - headerHeight) / 2
-    const elementCenterY = rect.top + rect.height / 2
-    const targetY = window.scrollY + (elementCenterY - viewportCenterY)
+const stopCenterScroll = () => {
+  if (centerScrollRaf) window.cancelAnimationFrame(centerScrollRaf)
+  centerScrollRaf = 0
+  centerScrollStopAt = 0
+  isCenteringScroll = false
+  ignoreAutoCollapseUntil = Math.max(ignoreAutoCollapseUntil, performance.now() + 140)
+  window.removeEventListener('wheel', interruptCenterScroll)
+  window.removeEventListener('touchstart', interruptCenterScroll)
+  window.removeEventListener('keydown', interruptCenterScroll)
+}
 
-    window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' })
-  }, delay)
+const scrollCardToCenter = async (opts?: { durationMs?: number }) => {
+  await nextTick()
+  stopCenterScroll()
+  isCenteringScroll = true
+  centerScrollUserInterrupted = false
+
+  const durationMs = opts?.durationMs ?? EXPAND_COLLAPSE_MS
+  ignoreAutoCollapseUntil = performance.now() + durationMs + 180
+  centerScrollStopAt = performance.now() + durationMs
+  window.addEventListener('wheel', interruptCenterScroll, { passive: true })
+  window.addEventListener('touchstart', interruptCenterScroll, { passive: true })
+  window.addEventListener('keydown', interruptCenterScroll)
+
+  const tick = () => {
+    const now = performance.now()
+    const target = getCardTargetScrollY()
+    if (target == null) return stopCenterScroll()
+
+    const current = window.scrollY
+    const remaining = Math.max(0, centerScrollStopAt - now)
+    const alpha = remaining < 120 ? 0.28 : 0.18
+    const next = current + (target - current) * alpha
+    window.scrollTo({ top: next, behavior: 'auto' })
+
+    if (now >= centerScrollStopAt || Math.abs(target - next) < 0.5) {
+      window.scrollTo({ top: target, behavior: 'auto' })
+      return stopCenterScroll()
+    }
+    centerScrollRaf = window.requestAnimationFrame(tick)
+  }
+
+  centerScrollRaf = window.requestAnimationFrame(tick)
+}
+
+const resetInnerScroll = () => {
+  const el = scrollerRef.value
+  if (!el) return
+  el.scrollTo({ top: 0, behavior: 'auto' })
+}
+
+const collapse = () => {
+  if (!isExpanded.value && !isVisuallyExpanded.value) return
+  isVisuallyExpanded.value = false
+  replyingTo.value = null
+  summaryRequestId += 1
+  isGenerating.value = false
+  window.setTimeout(resetInnerScroll, 0)
+  window.setTimeout(() => {
+    if (!isVisuallyExpanded.value) summary.value = ''
+  }, SUMMARY_COLLAPSE_MS)
+  window.setTimeout(() => {
+    if (!isVisuallyExpanded.value) isExpanded.value = false
+  }, EXPAND_COLLAPSE_MS)
+}
+
+const expand = () => {
+  if (!isExpanded.value) isExpanded.value = true
+  isVisuallyExpanded.value = true
+  window.dispatchEvent(new CustomEvent(EXPAND_EVENT, { detail: { id: props.post.id } }))
+  void scrollCardToCenter({ durationMs: EXPAND_COLLAPSE_MS })
+  window.setTimeout(() => {
+    if (!isVisuallyExpanded.value) return
+    if (centerScrollUserInterrupted) return
+    const target = getCardTargetScrollY()
+    if (target == null) return
+    if (Math.abs(window.scrollY - target) <= 2) return
+    void scrollCardToCenter({ durationMs: 180 })
+  }, EXPAND_COLLAPSE_MS + 80)
 }
 
 const toggleExpand = () => {
-  if (isExpanded.value) {
-    isExpanded.value = false
-    replyingTo.value = null
-    summaryRequestId += 1
-    isGenerating.value = false
-    window.setTimeout(() => {
-      if (!isExpanded.value) summary.value = ''
-    }, 360)
-    return
-  }
-
-  isExpanded.value = true
-  void scrollCardToCenter({ afterExpandAnimation: true })
+  if (isVisuallyExpanded.value) collapse()
+  else expand()
 }
 
 const handleArticleLike = () => {
@@ -148,7 +228,7 @@ const handleCommentLike = (item: { likes: number; hasLiked?: boolean }) => {
 
 const initReply = async (comment: CommentItem) => {
   replyingTo.value = comment.id
-  if (!isExpanded.value) isExpanded.value = true
+  if (!isVisuallyExpanded.value) expand()
   await nextTick()
   inputRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   inputRef.value?.querySelector('textarea')?.focus()
@@ -177,10 +257,9 @@ const submitComment = () => {
 
 const generateAiSummary = async () => {
   if (isGenerating.value || summary.value) return
-  if (!isExpanded.value) {
-    isExpanded.value = true
+  if (!isVisuallyExpanded.value) {
+    expand()
     await nextTick()
-    void scrollCardToCenter({ afterExpandAnimation: true })
   }
 
   const requestId = (summaryRequestId += 1)
@@ -205,13 +284,61 @@ const generateAiSummary = async () => {
     if (requestId === summaryRequestId) isGenerating.value = false
   }
 }
+
+let autoCollapseRaf = 0
+const checkAutoCollapse = () => {
+  if (!isVisuallyExpanded.value) return
+  if (isCenteringScroll) return
+  if (performance.now() < ignoreAutoCollapseUntil) return
+  const el = cardRef.value
+  if (!el) return
+
+  const headerHeight = getFixedHeaderHeight()
+  const thresholdY = headerHeight + (window.innerHeight - headerHeight) * 0.5
+  const bottom = el.getBoundingClientRect().bottom
+  if (bottom < thresholdY) collapse()
+}
+
+const onWindowScroll = () => {
+  if (autoCollapseRaf) return
+  autoCollapseRaf = window.requestAnimationFrame(() => {
+    autoCollapseRaf = 0
+    checkAutoCollapse()
+  })
+}
+
+const onOtherCardExpand = (e: Event) => {
+  const ce = e as CustomEvent<{ id?: number }>
+  if (ce.detail?.id === props.post.id) return
+  collapse()
+}
+
+watch(
+  isExpanded,
+  (expanded) => {
+    if (expanded) window.addEventListener('scroll', onWindowScroll, { passive: true })
+    else window.removeEventListener('scroll', onWindowScroll)
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  window.addEventListener(EXPAND_EVENT, onOtherCardExpand as EventListener)
+})
+
+onUnmounted(() => {
+  window.removeEventListener(EXPAND_EVENT, onOtherCardExpand as EventListener)
+  window.removeEventListener('scroll', onWindowScroll)
+  if (autoCollapseRaf) window.cancelAnimationFrame(autoCollapseRaf)
+  stopCenterScroll()
+})
 </script>
 
 <template>
   <div ref="cardRef" class="mb-8 group transition-transform duration-300 hover:-translate-y-1">
     <div
-      class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 dark:border-white/10 overflow-hidden relative flex flex-col transition-[max-height] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]"
-      :style="{ maxHeight: isExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_MAX_HEIGHT}px` }"
+      class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 dark:border-white/10 overflow-hidden relative flex flex-col transition-[max-height] duration-[520ms] ease-[cubic-bezier(0.25,1,0.5,1)]"
+      :style="{ maxHeight: isVisuallyExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_MAX_HEIGHT}px` }"
     >
       <div
         class="h-8 shrink-0 bg-gradient-to-b from-gray-100 to-gray-200 dark:from-[#3a3a3a] dark:to-[#2b2b2b] border-b border-gray-300 dark:border-black flex items-center px-4 justify-between z-20"
@@ -236,8 +363,12 @@ const generateAiSummary = async () => {
       <div class="relative flex-1">
         <div
           class="h-full p-6 mac-scrollbar transition-all duration-300"
-          :style="{ maxHeight: isExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_INNER_MAX_HEIGHT}px`}"
-          :class="[isExpanded ? 'overflow-y-auto' : 'overflow-hidden', !isExpanded && showExpandBtn ? 'pb-20' : '']"
+          :style="{ maxHeight: isVisuallyExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_INNER_MAX_HEIGHT}px` }"
+          :class="[
+            isVisuallyExpanded ? 'overflow-y-auto' : 'overflow-hidden',
+            !isVisuallyExpanded && showExpandBtn ? 'pb-20' : '',
+          ]"
+          ref="scrollerRef"
         >
           <div class="mb-2">
             <div class="flex items-center gap-3 mb-3">
@@ -273,9 +404,9 @@ const generateAiSummary = async () => {
             </div>
 
             <div
-              v-if="isGenerating || summary"
+              v-show="isGenerating || summary"
               class="mac-summary relative group/ai"
-              :class="isExpanded ? 'mac-summary--open' : 'mac-summary--closed'"
+              :class="isVisuallyExpanded ? 'mac-summary--open' : 'mac-summary--closed'"
             >
               <div class="absolute -inset-0.5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 rounded-lg opacity-20 blur group-hover/ai:opacity-30 transition duration-1000"></div>
               <div
@@ -295,29 +426,15 @@ const generateAiSummary = async () => {
 
           <div
             class="prose dark:prose-invert text-[15px] leading-relaxed font-sans max-w-none transition-all duration-300"
-            :class="{ 'mac-collapsed-preview': !isExpanded && showExpandBtn }"
+            :class="[!isVisuallyExpanded && showExpandBtn ? 'mac-collapsed-preview' : 'mac-expanded-view']"
             v-html="renderMarkdown(post.content)"
           ></div>
 
-          <div v-if="!isExpanded && showExpandBtn && hotComment" class="mt-4 pt-4 border-t border-dashed border-gray-200 dark:border-white/10">
-            <div class="flex gap-3 opacity-90 hover:opacity-100 transition-opacity">
-              <AvatarCircle :name="hotComment.user" size="sm" class="mt-1 shrink-0" />
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs font-bold text-gray-600 dark:text-gray-300">{{ hotComment.user }}</span>
-                  <span class="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
-                    <i class="ph ph-fire-fill"></i>
-                    HOT
-                  </span>
-                </div>
-                <div class="text-[13px] text-gray-600 dark:text-gray-300 mac-line-clamp-2">
-                  {{ hotComment.text }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="isExpanded" class="mt-8 pt-6 border-t border-gray-100 dark:border-white/5 space-y-6">
+          <div
+            v-show="isExpanded"
+            class="mt-8 pt-6 border-t border-gray-100 dark:border-white/5 space-y-6 transition-[opacity,transform] duration-300"
+            :class="isVisuallyExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'"
+          >
             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Comments ({{ comments.length }})</h4>
 
             <div v-for="comment in comments" :key="comment.id" class="animate-[fadeIn_0.3s_ease-out]">
@@ -379,7 +496,7 @@ const generateAiSummary = async () => {
 
             <div
                 ref="inputRef"
-                class="sticky bottom-0 z-50 pt-2 pb-6 px-4 -mx-4 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#1e1e1e] dark:via-[#1e1e1e]/95 backdrop-blur-sm"
+                class="sticky bottom-3 z-50 pt-2 pb-2 px-4 -mx-4 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#1e1e1e] dark:via-[#1e1e1e]/95 backdrop-blur-sm"
             >
               <div class="flex items-end gap-2">
                 <div
@@ -421,11 +538,13 @@ const generateAiSummary = async () => {
         </div>
 
         <div
-          v-if="!isExpanded && showExpandBtn"
-          class="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-white dark:from-[#1e1e1e] via-white/90 dark:via-[#1e1e1e]/90 to-transparent flex items-end justify-center pb-4 z-30 pointer-events-none animate-[fadeIn_0.2s_ease-out]"
+          v-show="showExpandBtn"
+          class="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-white dark:from-[#1e1e1e] via-white/90 dark:via-[#1e1e1e]/90 to-transparent flex items-end justify-center pb-4 z-30 pointer-events-none transition-opacity duration-[520ms]"
+          :class="isVisuallyExpanded ? 'opacity-0' : 'opacity-100'"
         >
           <button
-            class="pointer-events-auto px-6 py-2 rounded-full text-xs font-semibold bg-white dark:bg-[#3a3a3c] text-gray-600 dark:text-gray-200 border border-gray-200 dark:border-white/10 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 mb-2"
+            class="px-6 py-2 rounded-full text-xs font-semibold bg-white dark:bg-[#3a3a3c] text-gray-600 dark:text-gray-200 border border-gray-200 dark:border-white/10 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 mb-2"
+            :class="isVisuallyExpanded ? 'pointer-events-none' : 'pointer-events-auto'"
             @click="toggleExpand"
           >
             <span>展开阅读</span>
@@ -504,7 +623,15 @@ const generateAiSummary = async () => {
   position: relative;
   max-height: 240px;
   overflow: hidden;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) calc(100% - 72px), rgba(0, 0, 0, 0));
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) calc(100% - 80px), rgba(0, 0, 0, 0));
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) calc(100% - 80px), rgba(0, 0, 0, 0));
+  transition: max-height 0.52s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.mac-expanded-view {
+  max-height: 3000px;
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
 .mac-line-clamp-2 {
