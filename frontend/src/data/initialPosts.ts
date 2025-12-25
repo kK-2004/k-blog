@@ -1,6 +1,9 @@
 export type HotComment = {
+  id?: number
   user: string
   text: string
+  likes?: number
+  replies?: { id: number; user: string; text: string; likes?: number }[]
 }
 
 export type Post = {
@@ -81,4 +84,3 @@ docker run -d -p 80:80 nginx
     likes: 42,
   },
 ]
-

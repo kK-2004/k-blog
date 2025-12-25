@@ -4,13 +4,15 @@ import { getAvatarChar, getAvatarColor } from '@/composables/useAvatar'
 
 const props = defineProps<{
   name?: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
 }>()
 
 const colorClass = computed(() => getAvatarColor(props.name))
 const char = computed(() => getAvatarChar(props.name))
 const sizeClass = computed(() => {
   switch (props.size) {
+    case 'xs':
+      return 'w-4 h-4 text-[9px]'
     case 'sm':
       return 'w-5 h-5 text-[10px]'
     case 'md':
@@ -31,4 +33,3 @@ const sizeClass = computed(() => {
     {{ char }}
   </div>
 </template>
-
