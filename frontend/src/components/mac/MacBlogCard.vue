@@ -55,8 +55,12 @@ const hasLikedArticle = ref(false)
 const likeBouncing = ref(false)
 
 const summary = ref('')
+const displayedSummary = ref('')
 const isGenerating = ref(false)
 let summaryRequestId = 0
+let typingTimer: number | undefined
+
+const geminiGradientId = computed(() => `gemini_grad_${props.post.id}`)
 
 const showExpandBtn = computed(() => {
   const text = props.post.content || ''
@@ -174,7 +178,10 @@ const collapse = () => {
   isGenerating.value = false
   window.setTimeout(resetInnerScroll, 0)
   window.setTimeout(() => {
-    if (!isVisuallyExpanded.value) summary.value = ''
+    if (!isVisuallyExpanded.value) {
+      summary.value = ''
+      displayedSummary.value = ''
+    }
   }, SUMMARY_COLLAPSE_MS)
   window.setTimeout(() => {
     if (!isVisuallyExpanded.value) isExpanded.value = false
@@ -263,6 +270,7 @@ const generateAiSummary = async () => {
   }
 
   const requestId = (summaryRequestId += 1)
+  displayedSummary.value = ''
   isGenerating.value = true
 
   try {
@@ -284,6 +292,25 @@ const generateAiSummary = async () => {
     if (requestId === summaryRequestId) isGenerating.value = false
   }
 }
+
+watch(
+  summary,
+  (val) => {
+    if (typingTimer) window.clearTimeout(typingTimer)
+    displayedSummary.value = ''
+    if (!val) return
+
+    const tick = () => {
+      if (summary.value !== val) return
+      if (displayedSummary.value.length >= val.length) return
+      displayedSummary.value = val.slice(0, displayedSummary.value.length + 1)
+      typingTimer = window.setTimeout(tick, 15)
+    }
+
+    typingTimer = window.setTimeout(tick, 60)
+  },
+  { flush: 'post' },
+)
 
 let autoCollapseRaf = 0
 const checkAutoCollapse = () => {
@@ -330,6 +357,7 @@ onUnmounted(() => {
   window.removeEventListener(EXPAND_EVENT, onOtherCardExpand as EventListener)
   window.removeEventListener('scroll', onWindowScroll)
   if (autoCollapseRaf) window.cancelAnimationFrame(autoCollapseRaf)
+  if (typingTimer) window.clearTimeout(typingTimer)
   stopCenterScroll()
 })
 </script>
@@ -405,21 +433,67 @@ onUnmounted(() => {
 
             <div
               v-show="isGenerating || summary"
-              class="mac-summary relative group/ai"
-              :class="isVisuallyExpanded ? 'mac-summary--open' : 'mac-summary--closed'"
+              class="mac-summary relative mb-6 group/summary"
             >
-              <div class="absolute -inset-0.5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 rounded-lg opacity-20 blur group-hover/ai:opacity-30 transition duration-1000"></div>
               <div
-                class="relative bg-gray-50/90 dark:bg-[#252527]/90 backdrop-blur-md p-3 rounded-lg border border-white/50 dark:border-white/10 text-xs text-gray-600 dark:text-gray-300 leading-relaxed shadow-sm"
+                class="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-[#4E8AFF] via-[#A855F7] to-[#FF5D9E] blur-sm transition-opacity duration-500"
+                :class="isGenerating ? 'animate-pulse opacity-40' : 'opacity-20 group-hover/summary:opacity-30'"
+              ></div>
+
+              <div
+                class="mac-summary-shell relative rounded-xl"
+                :class="isVisuallyExpanded ? 'mac-summary--open' : 'mac-summary--closed'"
               >
-                <div v-if="isGenerating" class="flex items-center gap-2 text-gray-500">
-                  <i class="ph ph-circle-notch animate-spin text-blue-500"></i>
-                  <span class="animate-pulse">正在生成摘要...</span>
+                <div
+                class="relative bg-white/90 dark:bg-[#252527]/90 backdrop-blur-xl border border-white/50 dark:border-white/10 p-4 rounded-xl shadow-lg"
+              >
+                <div class="flex items-center gap-2 mb-3">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="animate-pulse"
+                  >
+                    <path
+                      d="M12 3L14.5 9.5L21 12L14.5 14.5L12 21L9.5 14.5L3 12L9.5 9.5L12 3Z"
+                      :fill="`url(#${geminiGradientId})`"
+                    />
+                    <defs>
+                      <linearGradient :id="geminiGradientId" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#4E8AFF" />
+                        <stop offset="0.5" stop-color="#A855F7" />
+                        <stop offset="1" stop-color="#FF5D9E" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  <span
+                    class="text-[10px] font-bold tracking-[0.2em] uppercase text-transparent bg-clip-text bg-gradient-to-r from-[#4E8AFF] to-[#FF5D9E]"
+                  >
+                    AI Summary
+                  </span>
                 </div>
-                <div v-else class="flex gap-2">
-                  <i class="ph ph-sparkle-fill text-purple-500 shrink-0 mt-0.5"></i>
-                  <div class="whitespace-pre-wrap">{{ summary }}</div>
+
+                <div class="text-[14px] leading-relaxed text-gray-700 dark:text-gray-300 font-medium">
+                  <div v-if="isGenerating" class="space-y-2">
+                    <div class="h-3 bg-gray-200 dark:bg-white/10 rounded w-full animate-pulse"></div>
+                    <div class="h-3 bg-gray-200 dark:bg-white/10 rounded w-[80%] animate-pulse"></div>
+                  </div>
+                  <p v-else class="whitespace-pre-wrap mac-summary-reveal">
+                    {{ displayedSummary }}
+                    <span
+                      v-if="displayedSummary.length < summary.length"
+                      class="inline-block w-1.5 h-4 ml-1 bg-blue-400 animate-pulse align-middle rounded-sm"
+                    ></span>
+                  </p>
                 </div>
+
+                <div class="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex justify-end">
+                  <span class="text-[9px] text-gray-400 dark:text-gray-500">Ai的回答未必正确无误，请注意核查</span>
+                </div>
+              </div>
               </div>
             </div>
           </div>
@@ -585,7 +659,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.mac-summary {
+.mac-summary-shell {
   overflow: hidden;
   transition:
     max-height 0.36s cubic-bezier(0.25, 1, 0.5, 1),
@@ -594,7 +668,7 @@ onUnmounted(() => {
 }
 
 .mac-summary--open {
-  max-height: 260px;
+  max-height: 360px;
   opacity: 1;
   margin-top: 0.75rem;
 }
@@ -609,6 +683,10 @@ onUnmounted(() => {
   animation: likeBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.mac-summary-reveal {
+  animation: summaryReveal 0.7s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
 @keyframes likeBounce {
   0%,
   100% {
@@ -616,6 +694,17 @@ onUnmounted(() => {
   }
   50% {
     transform: scale(1.2);
+  }
+}
+
+@keyframes summaryReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
