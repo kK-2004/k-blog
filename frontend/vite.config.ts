@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
+import path from 'node:path'
 import vue from '@vitejs/plugin-vue'
 
 function aiSummaryDevServer(): Plugin {
@@ -48,4 +49,9 @@ function aiSummaryDevServer(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), aiSummaryDevServer()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
 })

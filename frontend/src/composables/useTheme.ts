@@ -1,40 +1,54 @@
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-export const useTheme = () => {
-  const theme = ref<'light' | 'dark'>('light');
+export type ThemeMode = 'light' | 'dark'
 
-  const applyTheme = (nextTheme: 'light' | 'dark') => {
-    theme.value = nextTheme;
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(nextTheme);
-  };
+export function useTheme() {
+  const theme = ref<ThemeMode>('light')
+  let mq: MediaQueryList | null = null
+  let handler: ((e: MediaQueryListEvent) => void) | null = null
+
+  const applyThemeClass = (mode: ThemeMode) => {
+    document.documentElement.classList.remove('light', 'dark')
+    document.documentElement.classList.add(mode)
+  }
 
   const toggleTheme = () => {
-    applyTheme(theme.value === 'light' ? 'dark' : 'light');
-  };
+    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    applyThemeClass(theme.value)
+  }
 
-  // Initialize theme based on system preference
-  const initTheme = () => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const updateTheme = (e: MediaQueryList | MediaQueryListEvent) => {
-      applyTheme(e.matches ? 'dark' : 'light');
-    };
+  onMounted(() => {
+    mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const sync = (matches: boolean) => {
+      theme.value = matches ? 'dark' : 'light'
+      applyThemeClass(theme.value)
+    }
+    handler = (e) => sync(e.matches)
+    sync(mq.matches)
+    mq.addEventListener?.('change', handler)
+  })
 
-    // Initialize with system preference
-    updateTheme(mq);
-    
-    // Listen for system theme changes
-    mq.addEventListener('change', updateTheme);
+  onUnmounted(() => {
+    if (mq && handler) mq.removeEventListener?.('change', handler)
+  })
 
-    // Clean up listener on unmount
-    onUnmounted(() => mq.removeEventListener('change', updateTheme));
-  };
+  const bgStyle = computed(() => {
+    const lightDot = '#e5e5e5'
+    const darkDot = '#333333'
+    const dotPattern =
+      theme.value === 'light'
+        ? `radial-gradient(${lightDot} 2px, transparent 2px)`
+        : `radial-gradient(${darkDot} 2px, transparent 2px)`
 
-  onMounted(initTheme);
+    return {
+      backgroundColor: theme.value === 'light' ? '#ffffff' : '#000000',
+      backgroundImage: dotPattern,
+      backgroundSize: '24px 24px',
+      backgroundPosition: '0 0, 12px 12px',
+      backgroundAttachment: 'fixed',
+    } as const
+  })
 
-  return {
-    theme,
-    toggleTheme
-  };
-};
+  return { theme, toggleTheme, bgStyle }
+}
+
