@@ -35,7 +35,24 @@ const app = createApp({
 })
 \`\`\`
 
-逻辑复用比Mixins好用一万倍。组合式 API 让我们可以更加优雅地组织代码，特别是在处理复杂逻辑时。相比于 Vue 2 的 Options API，这种方式让相关联的逻辑（如数据获取、筛选、分页）能够聚合在一起，而不是分散在 data、methods 和 mounted 中。`,
+逻辑复用比Mixins好用一万倍。组合式 API 让我们可以更加优雅地组织代码，特别是在处理复杂逻辑时。相比于 Vue 2 的 Options API，这种方式让相关联的逻辑（如数据获取、筛选、分页）能够聚合在一起，而不是分散在 data、methods 和 mounted 中。
+今天把React项目重构成了Vue 3，Composition API 真的太香了！
+
+const app = createApp({
+  setup() {
+    return { count: ref(0) }
+  }
+})
+逻辑复用比Mixins好用一万倍。组合式 API 让我们可以更加优雅地组织代码，特别是在处理复杂逻辑时。相比于 Vue 2 的 Options API，这种方式让相关联的逻辑（如数据获取、筛选、分页）能够聚合在一起，而不是分散在 data、methods 和 mounted 中。
+今天把React项目重构成了Vue 3，Composition API 真的太香了！
+
+const app = createApp({
+  setup() {
+    return { count: ref(0) }
+  }
+})
+逻辑复用比Mixins好用一万倍。组合式 API 让我们可以更加优雅地组织代码，特别是在处理复杂逻辑时。相比于 Vue 2 的 Options API，这种方式让相关联的逻辑（如数据获取、筛选、分页）能够聚合在一起，而不是分散在 data、methods 和 mounted 中。
+`,
     hotComment: null,
     views: 1204,
     likes: 85,

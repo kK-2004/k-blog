@@ -22,12 +22,16 @@ const props = defineProps<{
   post: Post
 }>()
 
-const COLLAPSED_MAX_HEIGHT = 610
-const EXPANDED_MAX_HEIGHT = 1000
+const COLLAPSED_MAX_HEIGHT = 600
+const EXPANDED_MAX_HEIGHT = 770
+
+const COLLAPSED_INNER_MAX_HEIGHT = 400
 
 const isExpanded = ref(false)
 const replyingTo = ref<number | null>(null)
 const inputRef = ref<HTMLElement | null>(null)
+const cardRef = ref<HTMLElement | null>(null)
+let centerScrollTimer: number | null = null
 
 const draftUser = ref('')
 const draftText = ref('')
@@ -39,6 +43,7 @@ const likeBouncing = ref(false)
 
 const summary = ref('')
 const isGenerating = ref(false)
+let summaryRequestId = 0
 
 const showExpandBtn = computed(() => {
   const text = props.post.content || ''
@@ -73,8 +78,47 @@ watchEffect(() => {
 
 const readStats = useReadStats(computed(() => props.post.content))
 
+const getFixedHeaderHeight = () => {
+  const header = document.querySelector('header')
+  if (!header) return 0
+  const rect = header.getBoundingClientRect()
+  const isFixed = window.getComputedStyle(header).position === 'fixed'
+  return isFixed ? rect.height : 0
+}
+
+const scrollCardToCenter = async (opts?: { afterExpandAnimation?: boolean }) => {
+  if (centerScrollTimer) window.clearTimeout(centerScrollTimer)
+
+  const delay = opts?.afterExpandAnimation ? 520 : 0
+  centerScrollTimer = window.setTimeout(async () => {
+    await nextTick()
+    const el = cardRef.value
+    if (!el) return
+
+    const headerHeight = getFixedHeaderHeight()
+    const rect = el.getBoundingClientRect()
+    const viewportCenterY = headerHeight + (window.innerHeight - headerHeight) / 2
+    const elementCenterY = rect.top + rect.height / 2
+    const targetY = window.scrollY + (elementCenterY - viewportCenterY)
+
+    window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' })
+  }, delay)
+}
+
 const toggleExpand = () => {
-  isExpanded.value = !isExpanded.value
+  if (isExpanded.value) {
+    isExpanded.value = false
+    replyingTo.value = null
+    summaryRequestId += 1
+    isGenerating.value = false
+    window.setTimeout(() => {
+      if (!isExpanded.value) summary.value = ''
+    }, 360)
+    return
+  }
+
+  isExpanded.value = true
+  void scrollCardToCenter({ afterExpandAnimation: true })
 }
 
 const handleArticleLike = () => {
@@ -133,6 +177,13 @@ const submitComment = () => {
 
 const generateAiSummary = async () => {
   if (isGenerating.value || summary.value) return
+  if (!isExpanded.value) {
+    isExpanded.value = true
+    await nextTick()
+    void scrollCardToCenter({ afterExpandAnimation: true })
+  }
+
+  const requestId = (summaryRequestId += 1)
   isGenerating.value = true
 
   try {
@@ -143,19 +194,21 @@ const generateAiSummary = async () => {
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = (await res.json()) as { summary?: string }
+    if (requestId !== summaryRequestId) return
     summary.value = data.summary || '无法生成摘要'
   } catch {
+    if (requestId !== summaryRequestId) return
     await new Promise((r) => setTimeout(r, 1200))
     summary.value =
       '（演示模式：本地 /api/ai/summary 不可用）\n这是一段模拟摘要。你可以把摘要服务替换成真实的 Gemini / OpenAI 接口。'
   } finally {
-    isGenerating.value = false
+    if (requestId === summaryRequestId) isGenerating.value = false
   }
 }
 </script>
 
 <template>
-  <div class="mb-8 group transition-transform duration-300 hover:-translate-y-1">
+  <div ref="cardRef" class="mb-8 group transition-transform duration-300 hover:-translate-y-1">
     <div
       class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 dark:border-white/10 overflow-hidden relative flex flex-col transition-[max-height] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]"
       :style="{ maxHeight: isExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_MAX_HEIGHT}px` }"
@@ -165,7 +218,12 @@ const generateAiSummary = async () => {
       >
         <div class="flex gap-2">
           <div class="w-3 h-3 rounded-full bg-[#FF5F56] border border-black/10"></div>
-          <div class="w-3 h-3 rounded-full bg-[#FFBD2E] border border-black/10"></div>
+          <button
+            type="button"
+            class="w-3 h-3 rounded-full bg-[#FFBD2E] border border-black/10 hover:brightness-95 active:brightness-90 transition"
+            title="展开/折叠"
+            @click="toggleExpand"
+          ></button>
           <div class="w-3 h-3 rounded-full bg-[#27C93F] border border-black/10"></div>
         </div>
         <div class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 opacity-80">
@@ -178,9 +236,10 @@ const generateAiSummary = async () => {
       <div class="relative flex-1">
         <div
           class="h-full p-6 mac-scrollbar transition-all duration-300"
+          :style="{ maxHeight: isExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_INNER_MAX_HEIGHT}px`}"
           :class="[isExpanded ? 'overflow-y-auto' : 'overflow-hidden', !isExpanded && showExpandBtn ? 'pb-20' : '']"
         >
-          <div class="mb-5">
+          <div class="mb-2">
             <div class="flex items-center gap-3 mb-3">
               <AvatarCircle :name="post.author" size="lg" />
               <div>
@@ -213,7 +272,11 @@ const generateAiSummary = async () => {
               </button>
             </div>
 
-            <div v-if="isGenerating || summary" class="relative group/ai animate-[fadeIn_0.3s_ease-out]">
+            <div
+              v-if="isGenerating || summary"
+              class="mac-summary relative group/ai"
+              :class="isExpanded ? 'mac-summary--open' : 'mac-summary--closed'"
+            >
               <div class="absolute -inset-0.5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 rounded-lg opacity-20 blur group-hover/ai:opacity-30 transition duration-1000"></div>
               <div
                 class="relative bg-gray-50/90 dark:bg-[#252527]/90 backdrop-blur-md p-3 rounded-lg border border-white/50 dark:border-white/10 text-xs text-gray-600 dark:text-gray-300 leading-relaxed shadow-sm"
@@ -232,7 +295,7 @@ const generateAiSummary = async () => {
 
           <div
             class="prose dark:prose-invert text-[15px] leading-relaxed font-sans max-w-none transition-all duration-300"
-            :class="{ 'line-clamp-5': !isExpanded && showExpandBtn }"
+            :class="{ 'mac-collapsed-preview': !isExpanded && showExpandBtn }"
             v-html="renderMarkdown(post.content)"
           ></div>
 
@@ -315,43 +378,45 @@ const generateAiSummary = async () => {
             </div>
 
             <div
-              ref="inputRef"
-              class="flex items-end gap-2 pt-4 sticky bottom-0 bg-white/95 dark:bg-[#1e1e1e]/95 backdrop-blur py-2 z-10"
+                ref="inputRef"
+                class="sticky bottom-0 z-50 pt-2 pb-6 px-4 -mx-4 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#1e1e1e] dark:via-[#1e1e1e]/95 backdrop-blur-sm"
             >
-              <div
-                class="flex-1 bg-gray-100 dark:bg-[#2c2c2e] p-1 rounded-[20px] border border-transparent focus-within:border-blue-500/30 transition-all flex flex-col shadow-inner"
-              >
+              <div class="flex items-end gap-2">
                 <div
-                  v-if="replyingTo"
-                  class="px-3 py-1 text-[10px] text-blue-500 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 rounded-t-[16px] mb-1"
+                    class="flex-1 bg-gray-100 dark:bg-[#2c2c2e] p-1 rounded-[20px] border border-transparent focus-within:border-blue-500/30 transition-all flex flex-col shadow-inner"
                 >
-                  <span>回复 #{{ replyingTo }}...</span>
-                  <button class="hover:text-red-500" @click="replyingTo = null">
-                    <i class="ph ph-x"></i>
-                  </button>
+                  <div
+                      v-if="replyingTo"
+                      class="px-3 py-1 text-[10px] text-blue-500 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 rounded-t-[16px] mb-1"
+                  >
+                    <span>回复 #{{ replyingTo }}...</span>
+                    <button class="hover:text-red-500" @click="replyingTo = null">
+                      <i class="ph ph-x"></i>
+                    </button>
+                  </div>
+                  <input
+                      v-model="draftUser"
+                      placeholder="Nickname..."
+                      class="bg-transparent text-[10px] text-gray-500 dark:text-gray-400 px-3 py-1 outline-none w-full border-b border-gray-200 dark:border-white/5 mb-1 placeholder-gray-400/70"
+                  />
+                  <textarea
+                      v-model="draftText"
+                      :placeholder="replyingTo ? '写下你的回复...' : '发表评论...'"
+                      rows="1"
+                      class="bg-transparent text-sm px-3 py-1 outline-none w-full resize-none text-gray-800 dark:text-gray-100 placeholder-gray-400"
+                      style="min-height: 24px"
+                  ></textarea>
                 </div>
-                <input
-                  v-model="draftUser"
-                  placeholder="Nickname..."
-                  class="bg-transparent text-[10px] text-gray-500 dark:text-gray-400 px-3 py-1 outline-none w-full border-b border-gray-200 dark:border-white/5 mb-1 placeholder-gray-400/70"
-                />
-                <textarea
-                  v-model="draftText"
-                  :placeholder="replyingTo ? '写下你的回复...' : '发表评论...'"
-                  rows="1"
-                  class="bg-transparent text-sm px-3 py-1 outline-none w-full resize-none text-gray-800 dark:text-gray-100 placeholder-gray-400"
-                  style="min-height: 24px"
-                ></textarea>
+
+                <button
+                    class="w-8 h-8 rounded-full bg-[#007AFF] hover:bg-[#0062cc] disabled:bg-gray-300 dark:disabled:bg-gray-600 flex items-center justify-center text-white transition-all shadow-md active:scale-95 mb-0.5"
+                    :disabled="!draftText.trim()"
+                    @click="submitComment"
+                >
+                  <i class="ph ph-paper-plane-right font-bold"></i>
+                </button>
               </div>
-              <button
-                class="w-8 h-8 rounded-full bg-[#007AFF] hover:bg-[#0062cc] disabled:bg-gray-300 dark:disabled:bg-gray-600 flex items-center justify-center text-white transition-all shadow-md active:scale-95 mb-0.5"
-                :disabled="!draftText.trim()"
-                @click="submitComment"
-              >
-                <i class="ph ph-paper-plane-right font-bold"></i>
-              </button>
             </div>
-            <div class="h-8 w-full"></div>
           </div>
         </div>
 
@@ -396,20 +461,31 @@ const generateAiSummary = async () => {
         </button>
       </div>
 
-      <div v-if="isExpanded && showExpandBtn" class="absolute bottom-16 right-6 z-40">
-        <button
-          class="w-10 h-10 rounded-full bg-gray-200/80 dark:bg-gray-700/80 backdrop-blur text-gray-600 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90"
-          title="收起"
-          @click="toggleExpand"
-        >
-          <i class="ph ph-caret-up text-lg"></i>
-        </button>
-      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.mac-summary {
+  overflow: hidden;
+  transition:
+    max-height 0.36s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.24s ease,
+    margin-top 0.36s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.mac-summary--open {
+  max-height: 260px;
+  opacity: 1;
+  margin-top: 0.75rem;
+}
+
+.mac-summary--closed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
 .mac-like-bounce {
   animation: likeBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -424,11 +500,11 @@ const generateAiSummary = async () => {
   }
 }
 
-.line-clamp-5 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
+.mac-collapsed-preview {
+  position: relative;
+  max-height: 240px;
   overflow: hidden;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) calc(100% - 72px), rgba(0, 0, 0, 0));
 }
 
 .mac-line-clamp-2 {
