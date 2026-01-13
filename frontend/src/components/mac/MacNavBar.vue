@@ -4,12 +4,14 @@ import AvatarCircle from './AvatarCircle.vue'
 defineProps<{
   timeStr: string
   theme: 'light' | 'dark'
+  isAuthenticated: boolean
 }>()
 
 defineEmits<{
   (e: 'toggle-sidebar'): void
   (e: 'avatar-click'): void
   (e: 'toggle-theme'): void
+  (e: 'logout'): void
 }>()
 </script>
 
@@ -24,13 +26,24 @@ defineEmits<{
       <div class="flex items-center gap-3">
         <button class="relative group cursor-pointer" @click="$emit('avatar-click')">
           <AvatarCircle name="Admin" size="sm" />
-          <span class="absolute top-0 right-0 w-1.5 h-1.5 bg-green-500 border border-white dark:border-black rounded-full"></span>
+          <span
+            class="absolute top-0 right-0 w-1.5 h-1.5 border border-white dark:border-black rounded-full"
+            :class="isAuthenticated ? 'bg-green-500' : 'bg-gray-400'"
+          ></span>
         </button>
         <span class="font-bold tracking-tight">KK Blog</span>
       </div>
     </div>
 
     <div class="flex items-center gap-4">
+      <button
+        v-if="isAuthenticated"
+        class="p-1 rounded hover:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400"
+        @click="$emit('logout')"
+        title="退出登录"
+      >
+        <i class="ph ph-sign-out text-lg"></i>
+      </button>
       <button class="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10" @click="$emit('toggle-theme')">
         <i :class="['ph', theme === 'light' ? 'ph-moon' : 'ph-sun', 'text-lg']"></i>
       </button>

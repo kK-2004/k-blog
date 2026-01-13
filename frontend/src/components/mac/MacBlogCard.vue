@@ -11,6 +11,7 @@ type ReplyItem = {
   text: string
   likes: number
   hasLiked?: boolean
+  toUser?: string
 }
 
 type CommentItem = ReplyItem & {
@@ -31,7 +32,7 @@ const COLLAPSED_INNER_MAX_HEIGHT = 400
 
 const isExpanded = ref(false)
 const isVisuallyExpanded = ref(false)
-const replyingTo = ref<number | null>(null)
+const replyingTo = ref<{ rootId: number; toUser?: string } | null>(null)
 const inputRef = ref<HTMLElement | null>(null)
 const cardRef = ref<HTMLElement | null>(null)
 const scrollerRef = ref<HTMLElement | null>(null)
@@ -48,7 +49,23 @@ const interruptCenterScroll = () => {
 
 const draftUser = ref('')
 const draftText = ref('')
+const allComments = ref<CommentItem[]>([])
 const comments = ref<CommentItem[]>([])
+const COMMENTS_PAGE_SIZE = 5
+const commentsLoading = ref(false)
+const commentsHasMore = ref(false)
+let innerScrollRaf = 0
+let lastInnerScrollTop = 0
+const hasInnerUserScrolled = ref(false)
+
+type ReplyPagingState = {
+  isOpen: boolean
+  loading: boolean
+  hasMore: boolean
+}
+
+const repliesVisible = ref<Record<number, ReplyItem[]>>({})
+const repliesState = ref<Record<number, ReplyPagingState>>({})
 
 const localArticleLikes = ref(props.post.likes)
 const hasLikedArticle = ref(false)
@@ -67,6 +84,105 @@ const showExpandBtn = computed(() => {
   return text.length > 100 || text.includes('```') || Boolean(props.post.hotComment)
 })
 
+const readStats = useReadStats(computed(() => props.post.content))
+
+const EXPAND_EVENT = 'mac-blog-card:expand'
+
+const resetCommentPaging = () => {
+  comments.value = []
+  commentsHasMore.value = false
+  commentsLoading.value = false
+  repliesVisible.value = {}
+  repliesState.value = {}
+  lastInnerScrollTop = 0
+  hasInnerUserScrolled.value = false
+  void loadMoreComments()
+}
+
+const fetchCommentsPage = async (offset: number, limit: number) => {
+  return allComments.value.slice(offset, offset + limit)
+}
+
+const loadMoreComments = async () => {
+  if (commentsLoading.value) return
+  const offset = comments.value.length
+  if (offset >= allComments.value.length) {
+    commentsHasMore.value = false
+    return
+  }
+
+  commentsLoading.value = true
+  try {
+    const items = await fetchCommentsPage(offset, COMMENTS_PAGE_SIZE)
+    comments.value.push(...items)
+  } finally {
+    commentsLoading.value = false
+    commentsHasMore.value = comments.value.length < allComments.value.length
+  }
+}
+
+const getRepliesTotal = (commentId: number) => {
+  const c = allComments.value.find((x) => x.id === commentId)
+  return c?.replies.length ?? 0
+}
+
+const ensureReplyState = (commentId: number) => {
+  if (!repliesState.value[commentId]) {
+    repliesState.value[commentId] = { isOpen: false, loading: false, hasMore: getRepliesTotal(commentId) > 0 }
+  }
+  if (!repliesVisible.value[commentId]) repliesVisible.value[commentId] = []
+}
+
+const fetchRepliesPage = async (commentId: number, offset: number, limit: number) => {
+  const c = allComments.value.find((x) => x.id === commentId)
+  return (c?.replies ?? []).slice(offset, offset + limit)
+}
+
+const loadMoreReplies = async (commentId: number) => {
+  ensureReplyState(commentId)
+  const state = repliesState.value[commentId]!
+  const visible = repliesVisible.value[commentId]!
+  if (state.loading) return
+  state.loading = true
+  state.isOpen = true
+
+  try {
+    const offset = visible.length
+    const items = await fetchRepliesPage(commentId, offset, COMMENTS_PAGE_SIZE)
+    visible.push(...items)
+  } finally {
+    state.loading = false
+    state.hasMore = visible.length < getRepliesTotal(commentId)
+  }
+}
+
+const isRepliesOpen = (commentId: number) => repliesState.value[commentId]?.isOpen ?? false
+const isRepliesLoading = (commentId: number) => repliesState.value[commentId]?.loading ?? false
+const repliesHasMore = (commentId: number) => repliesState.value[commentId]?.hasMore ?? getRepliesTotal(commentId) > 0
+const getVisibleReplies = (commentId: number) => repliesVisible.value[commentId] ?? []
+
+const maybeLoadMoreOnScroll = () => {
+  const el = scrollerRef.value
+  if (!el) return
+  if (!isExpanded.value) return
+  if (!commentsHasMore.value || commentsLoading.value) return
+  const currentTop = el.scrollTop
+  if (currentTop > 0) hasInnerUserScrolled.value = true
+  const scrolledDown = currentTop > lastInnerScrollTop + 1
+  lastInnerScrollTop = currentTop
+  if (!hasInnerUserScrolled.value) return
+  if (!scrolledDown) return
+  if (currentTop + el.clientHeight >= el.scrollHeight - 90) void loadMoreComments()
+}
+
+const onInnerScroll = () => {
+  if (innerScrollRaf) return
+  innerScrollRaf = window.requestAnimationFrame(() => {
+    innerScrollRaf = 0
+    maybeLoadMoreOnScroll()
+  })
+}
+
 watchEffect(() => {
   if (!showExpandBtn.value) {
     isExpanded.value = true
@@ -74,29 +190,36 @@ watchEffect(() => {
   }
 })
 
-watchEffect(() => {
-  comments.value = []
-  const hc = props.post.hotComment
-  if (!hc) return
+watch(
+  () => props.post.hotComment,
+  (hc) => {
+    allComments.value = []
+    if (hc) {
+      allComments.value.push({
+        id: hc.id ?? props.post.id * 1000 + 1,
+        user: hc.user,
+        text: hc.text,
+        likes: hc.likes ?? Math.max(1, Math.round(props.post.likes / 4)),
+        replies: (hc.replies ?? []).map((r) => ({
+          id: r.id,
+          user: r.user,
+          text: r.text,
+          likes: r.likes ?? 0,
+        })),
+        isHot: true,
+      })
+    }
+    resetCommentPaging()
+  },
+  { immediate: true },
+)
 
-  comments.value.push({
-    id: hc.id ?? props.post.id * 1000 + 1,
-    user: hc.user,
-    text: hc.text,
-    likes: hc.likes ?? Math.max(1, Math.round(props.post.likes / 4)),
-    replies: (hc.replies ?? []).map((r) => ({
-      id: r.id,
-      user: r.user,
-      text: r.text,
-      likes: r.likes ?? 0,
-    })),
-    isHot: true,
-  })
+watchEffect((onCleanup) => {
+  const el = scrollerRef.value
+  if (!el) return
+  el.addEventListener('scroll', onInnerScroll, { passive: true })
+  onCleanup(() => el.removeEventListener('scroll', onInnerScroll))
 })
-
-const readStats = useReadStats(computed(() => props.post.content))
-
-const EXPAND_EVENT = 'mac-blog-card:expand'
 
 const getFixedHeaderHeight = () => {
   const header = document.querySelector('header')
@@ -168,6 +291,8 @@ const resetInnerScroll = () => {
   const el = scrollerRef.value
   if (!el) return
   el.scrollTo({ top: 0, behavior: 'auto' })
+  lastInnerScrollTop = 0
+  hasInnerUserScrolled.value = false
 }
 
 const collapse = () => {
@@ -233,33 +358,66 @@ const handleCommentLike = (item: { likes: number; hasLiked?: boolean }) => {
   }
 }
 
+const scrollToCommentById = async (id: number) => {
+  await nextTick()
+  const container = scrollerRef.value
+  if (!container) return
+  const el = container.querySelector(`[data-comment-id="${id}"]`) as HTMLElement | null
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 const initReply = async (comment: CommentItem) => {
-  replyingTo.value = comment.id
+  replyingTo.value = { rootId: comment.id }
   if (!isVisuallyExpanded.value) expand()
   await nextTick()
   inputRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   inputRef.value?.querySelector('textarea')?.focus()
 }
 
-const submitComment = () => {
+const initReplyToReply = async (comment: CommentItem, reply: ReplyItem) => {
+  replyingTo.value = { rootId: comment.id, toUser: reply.user }
+  if (!isVisuallyExpanded.value) expand()
+  await nextTick()
+  inputRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  inputRef.value?.querySelector('textarea')?.focus()
+}
+
+const submitComment = async () => {
   if (!draftText.value.trim()) return
 
+  const newId = Date.now()
   const newItem: ReplyItem = {
-    id: Date.now(),
+    id: newId,
     user: draftUser.value.trim() || 'Guest',
     text: draftText.value,
     likes: 0,
   }
 
   if (replyingTo.value) {
-    const parent = comments.value.find((c) => c.id === replyingTo.value)
-    if (parent) parent.replies.push(newItem)
-    replyingTo.value = null
+    const parent = allComments.value.find((c) => c.id === replyingTo.value?.rootId)
+    if (parent) {
+      const replyToAdd = { ...newItem, toUser: replyingTo.value.toUser }
+      parent.replies.push(replyToAdd)
+      ensureReplyState(parent.id)
+      repliesState.value[parent.id]!.isOpen = true
+      repliesVisible.value[parent.id]!.push(replyToAdd)
+      repliesState.value[parent.id]!.hasMore = repliesVisible.value[parent.id]!.length < getRepliesTotal(parent.id)
+      replyingTo.value = null
+      draftText.value = ''
+      await scrollToCommentById(newId)
+      return
+    }
   } else {
-    comments.value.push({ ...newItem, isHot: false, replies: [] })
+    const commentToAdd: CommentItem = { ...newItem, isHot: false, replies: [] }
+    allComments.value.unshift(commentToAdd)
+    comments.value.unshift(commentToAdd)
+    if (comments.value.length > COMMENTS_PAGE_SIZE) comments.value.pop()
+    commentsHasMore.value = comments.value.length < allComments.value.length
   }
 
   draftText.value = ''
+  await scrollToCommentById(newId)
 }
 
 const generateAiSummary = async () => {
@@ -357,6 +515,7 @@ onUnmounted(() => {
   window.removeEventListener(EXPAND_EVENT, onOtherCardExpand as EventListener)
   window.removeEventListener('scroll', onWindowScroll)
   if (autoCollapseRaf) window.cancelAnimationFrame(autoCollapseRaf)
+  if (innerScrollRaf) window.cancelAnimationFrame(innerScrollRaf)
   if (typingTimer) window.clearTimeout(typingTimer)
   stopCenterScroll()
 })
@@ -504,73 +663,106 @@ onUnmounted(() => {
             v-html="renderMarkdown(post.content)"
           ></div>
 
-          <div
-            v-show="isExpanded"
-            class="mt-8 pt-6 border-t border-gray-100 dark:border-white/5 space-y-6 transition-[opacity,transform] duration-300"
-            :class="isVisuallyExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'"
-          >
-            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Comments ({{ comments.length }})</h4>
+	          <div
+	            v-show="isExpanded"
+	            class="mt-8 pt-6 pb-10 border-t border-gray-100 dark:border-white/5 space-y-6 transition-[opacity,transform] duration-300"
+	            :class="isVisuallyExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'"
+	          >
+		            <h4 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Comments ({{ allComments.length }})</h4>
 
-            <div v-for="comment in comments" :key="comment.id" class="animate-[fadeIn_0.3s_ease-out]">
-              <div class="flex gap-3">
-                <AvatarCircle :name="comment.user" size="md" class="shrink-0 mt-1" />
+	            <div v-for="comment in comments" :key="comment.id" class="animate-[fadeIn_0.3s_ease-out]" :data-comment-id="comment.id">
+	              <div class="flex gap-3">
+	                <AvatarCircle :name="comment.user" size="md" class="shrink-0 mt-1" />
 
-                <div class="flex flex-col items-start max-w-[85%] flex-1">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ comment.user }}</span>
-                    <span v-if="comment.isHot" class="bg-red-500 text-white text-[9px] px-1 rounded font-bold">HOT</span>
-                  </div>
-                  <div
-                    class="bg-[#e9e9eb] dark:bg-[#3a3a3c] px-3 py-2 rounded-2xl rounded-tl-sm text-[13px] text-gray-800 dark:text-gray-100 leading-normal mb-1"
-                  >
-                    {{ comment.text }}
-                  </div>
-                  <div class="flex gap-4 px-1">
-                    <button
-                      class="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-red-500 transition-colors"
-                      :class="{ 'text-red-500': comment.hasLiked }"
-                      @click="handleCommentLike(comment)"
-                    >
-                      <i :class="comment.hasLiked ? 'ph-fill ph-heart' : 'ph ph-heart'"></i>
-                      {{ comment.likes }}
-                    </button>
-                    <button class="text-[10px] font-medium text-gray-400 hover:text-blue-500 transition-colors" @click="initReply(comment)">
-                      回复
-                    </button>
-                  </div>
-                </div>
-              </div>
+	                <div class="flex flex-col items-start max-w-[85%] flex-1">
+	                  <div class="flex items-center gap-2 mb-1">
+	                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ comment.user }}</span>
+	                    <span v-if="comment.isHot" class="bg-red-500 text-white text-[9px] px-1 rounded font-bold">HOT</span>
+	                  </div>
+	                  <div
+	                    class="bg-[#e9e9eb] dark:bg-[#3a3a3c] px-3 py-2 rounded-2xl rounded-tl-sm text-[14px] text-gray-800 dark:text-gray-100 leading-relaxed mb-1"
+	                  >
+	                    {{ comment.text }}
+	                  </div>
+	                  <div class="flex gap-4 px-1">
+	                    <button
+	                      class="flex items-center gap-1 text-[11px] font-medium text-gray-400 hover:text-red-500 transition-colors"
+	                      :class="{ 'text-red-500': comment.hasLiked }"
+	                      @click="handleCommentLike(comment)"
+	                    >
+	                      <i :class="comment.hasLiked ? 'ph-fill ph-heart' : 'ph ph-heart'"></i>
+	                      {{ comment.likes }}
+	                    </button>
+	                    <button class="text-[11px] font-medium text-gray-400 hover:text-blue-500 transition-colors" @click="initReply(comment)">
+	                      回复
+	                    </button>
+	                  </div>
+	                </div>
+	              </div>
 
-              <div v-if="comment.replies.length" class="ml-11 mt-3 space-y-3 pl-3 border-l-2 border-gray-100 dark:border-white/5">
-                <div v-for="reply in comment.replies" :key="reply.id" class="flex gap-2">
-                  <AvatarCircle :name="reply.user" size="xs" class="shrink-0 mt-1" />
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 mb-0.5">
-                      <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400">{{ reply.user }}</span>
-                    </div>
-                    <div
-                      class="text-[12px] text-gray-700 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-white/5 px-2 py-1.5 rounded-lg rounded-tl-none inline-block"
-                    >
-                      {{ reply.text }}
-                    </div>
-                    <div class="flex gap-3 px-1 mt-0.5">
-                      <button
-                        class="flex items-center gap-1 text-[9px] text-gray-400 hover:text-red-500 transition-colors"
-                        :class="{ 'text-red-500': reply.hasLiked }"
-                        @click="handleCommentLike(reply)"
-                      >
-                        <i :class="reply.hasLiked ? 'ph-fill ph-heart' : 'ph ph-heart'"></i>
-                        {{ reply.likes }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+		              <div v-if="getRepliesTotal(comment.id)" class="ml-11 mt-3 pl-3 border-l-2 border-gray-100 dark:border-white/5">
+		                <button
+		                  v-if="!isRepliesOpen(comment.id)"
+		                  class="text-[11px] font-semibold text-blue-500 hover:text-blue-600 transition-colors"
+		                  :disabled="isRepliesLoading(comment.id)"
+		                  @click="loadMoreReplies(comment.id)"
+		                >
+		                  {{ isRepliesLoading(comment.id) ? '加载中...' : `查看更多回复 (${getRepliesTotal(comment.id)})` }}
+		                </button>
+
+		                <div v-else class="space-y-3">
+		                  <div v-for="reply in getVisibleReplies(comment.id)" :key="reply.id" class="flex gap-2" :data-comment-id="reply.id">
+		                    <AvatarCircle :name="reply.user" size="xs" class="shrink-0 mt-1" />
+		                    <div class="min-w-0 flex-1">
+		                      <div class="flex items-center gap-2 mb-0.5">
+		                        <span class="text-[12px] font-bold text-gray-500 dark:text-gray-400">
+		                          {{ reply.user }}<span v-if="reply.toUser" class="font-medium opacity-80"> to {{ reply.toUser }}</span>
+		                        </span>
+		                      </div>
+		                      <div
+		                        class="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-white/5 px-2.5 py-2 rounded-lg rounded-tl-none inline-block"
+		                      >
+		                        {{ reply.text }}
+		                      </div>
+		                      <div class="flex gap-3 px-1 mt-0.5">
+		                        <button
+		                          class="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500 transition-colors"
+		                          :class="{ 'text-red-500': reply.hasLiked }"
+		                          @click="handleCommentLike(reply)"
+		                        >
+		                          <i :class="reply.hasLiked ? 'ph-fill ph-heart' : 'ph ph-heart'"></i>
+		                          {{ reply.likes }}
+		                        </button>
+		                        <button
+		                          class="text-[11px] font-medium text-gray-400 hover:text-blue-500 transition-colors"
+		                          @click="initReplyToReply(comment, reply)"
+		                        >
+		                          回复
+		                        </button>
+		                      </div>
+		                    </div>
+		                  </div>
+
+		                  <button
+		                    v-if="repliesHasMore(comment.id)"
+		                    class="text-[11px] font-semibold text-blue-500 hover:text-blue-600 transition-colors"
+		                    :disabled="isRepliesLoading(comment.id)"
+		                    @click="loadMoreReplies(comment.id)"
+		                  >
+		                    {{ isRepliesLoading(comment.id) ? '加载中...' : '查看更多' }}
+		                  </button>
+		                </div>
+		              </div>
+		            </div>
+
+		            <div v-if="commentsLoading || commentsHasMore" class="text-center text-[11px] text-gray-400">
+		              <span v-if="commentsLoading">加载更多评论中...</span>
+		              <span v-else>滑动到底加载更多评论</span>
+		            </div>
 
             <div
                 ref="inputRef"
-                class="sticky bottom-3 z-50 pt-2 pb-2 px-4 -mx-4 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#1e1e1e] dark:via-[#1e1e1e]/95 backdrop-blur-sm"
+                class="sticky bottom-3 z-50 pt-3 pb-3 px-6 -mx-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#1e1e1e] dark:via-[#1e1e1e]/95 backdrop-blur-sm"
             >
               <div class="flex items-end gap-2">
                 <div
@@ -578,9 +770,13 @@ onUnmounted(() => {
                 >
                   <div
                       v-if="replyingTo"
-                      class="px-3 py-1 text-[10px] text-blue-500 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 rounded-t-[16px] mb-1"
-                  >
-                    <span>回复 #{{ replyingTo }}...</span>
+	                      class="px-3 py-1 text-[11px] text-blue-500 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 rounded-t-[16px] mb-1"
+	                  >
+                    <span>
+                      回复<span v-if="replyingTo.toUser" class="font-bold"> @{{ replyingTo.toUser }}</span
+                      ><span v-else class="font-bold"> #{{ replyingTo.rootId }}</span
+                      >...
+                    </span>
                     <button class="hover:text-red-500" @click="replyingTo = null">
                       <i class="ph ph-x"></i>
                     </button>
@@ -592,7 +788,7 @@ onUnmounted(() => {
                   />
                   <textarea
                       v-model="draftText"
-                      :placeholder="replyingTo ? '写下你的回复...' : '发表评论...'"
+                      :placeholder="replyingTo ? (replyingTo.toUser ? `回复 @${replyingTo.toUser}...` : `回复 #${replyingTo.rootId}...`) : '发表评论...'"
                       rows="1"
                       class="bg-transparent text-sm px-3 py-1 outline-none w-full resize-none text-gray-800 dark:text-gray-100 placeholder-gray-400"
                       style="min-height: 24px"
@@ -646,7 +842,7 @@ onUnmounted(() => {
           </button>
           <button class="flex items-center gap-1.5 text-gray-400 hover:text-blue-500 transition-colors group" @click="toggleExpand">
             <i class="ph ph-chat-circle text-xl group-hover:scale-110 transition-transform"></i>
-            <span class="text-xs font-medium">{{ comments.length }}</span>
+            <span class="text-xs font-medium">{{ allComments.length }}</span>
           </button>
         </div>
         <button class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors" title="分享">
