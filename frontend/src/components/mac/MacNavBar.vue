@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import AvatarCircle from './AvatarCircle.vue'
+import { useUserAvatar } from '@/composables/useUserAvatar'
 
 defineProps<{
   timeStr: string
@@ -13,6 +15,21 @@ defineEmits<{
   (e: 'toggle-theme'): void
   (e: 'logout'): void
 }>()
+
+const { avatarUrl, hasCustomAvatar, loadAvatar } = useUserAvatar()
+const imageError = ref(false)
+
+onMounted(() => {
+  loadAvatar()
+})
+
+const handleImageError = () => {
+  imageError.value = true
+}
+
+const handleImageLoad = () => {
+  imageError.value = false
+}
 </script>
 
 <template>
@@ -25,7 +42,17 @@ defineEmits<{
       </button>
       <div class="flex items-center gap-3">
         <button class="relative group cursor-pointer" @click="$emit('avatar-click')">
-          <AvatarCircle name="Admin" size="sm" />
+          <!-- 自定义头像 -->
+          <img
+            v-if="hasCustomAvatar && !imageError && avatarUrl"
+            :src="avatarUrl"
+            alt="User Avatar"
+            class="w-5 h-5 rounded-full object-cover shadow-sm"
+            @error="handleImageError"
+            @load="handleImageLoad"
+          />
+          <!-- 降级到默认头像 -->
+          <AvatarCircle v-else name="kk" size="sm" />
           <span
             class="absolute top-0 right-0 w-1.5 h-1.5 border border-white dark:border-black rounded-full"
             :class="isAuthenticated ? 'bg-green-500' : 'bg-gray-400'"

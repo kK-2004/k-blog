@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useSidebarConfig, type MenuItem } from '@/composables/useSidebarConfig'
+import { useBackendSidebarConfig } from '@/composables/useBackendSidebarConfig'
+import type { MenuItem } from '@/api/types'
 
-const { allMenuItems, toggleVisibility, reorderItems, resetToDefault } = useSidebarConfig()
+const { allMenuItems, toggleVisibility, toggleRequiresAuth, reorderItems, resetToDefault, loadConfig, isSaving } = useBackendSidebarConfig()
+void loadConfig()
 
 const draggedItem = ref<MenuItem | null>(null)
 const draggedIndex = ref<number | null>(null)
@@ -24,7 +26,7 @@ const onDrop = (targetIndex: number) => {
 
   if (removed) {
     items.splice(targetIndex, 0, removed)
-    reorderItems(items)
+    void reorderItems(items)
   }
 
   draggedItem.value = null
@@ -39,11 +41,14 @@ const onDrop = (targetIndex: number) => {
       <div class="flex items-center justify-between mb-6">
         <div>
           <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100">侧边栏菜单配置</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">拖拽可调整菜单顺序，点击眼睛图标切换显示</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            拖拽可调整菜单顺序，锁图标控制是否需要登录，眼睛图标控制是否显示
+          </p>
         </div>
         <button
           class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-lg transition-colors text-gray-700 dark:text-gray-300"
           @click="resetToDefault"
+          :disabled="isSaving"
         >
           重置默认
         </button>
@@ -76,13 +81,26 @@ const onDrop = (targetIndex: number) => {
             </div>
           </div>
 
-          <button
-            class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-            :class="item.visible ? 'text-green-500' : 'text-gray-400'"
-            @click="toggleVisibility(item.id)"
-          >
-            <i :class="['ph', item.visible ? 'ph-eye' : 'ph-eye-slash', 'text-lg']"></i>
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              :class="item.requiresAuth ? 'text-orange-500' : 'text-gray-400'"
+              :title="item.requiresAuth ? '点击设为公开' : '点击设为需要登录'"
+              @click="toggleRequiresAuth(item.id)"
+              :disabled="isSaving"
+            >
+              <i :class="['ph', item.requiresAuth ? 'ph-lock-key' : 'ph-lock-open', 'text-lg']"></i>
+            </button>
+            <button
+              class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              :class="item.visible ? 'text-green-500' : 'text-gray-400'"
+              :title="item.visible ? '点击隐藏' : '点击显示'"
+              @click="toggleVisibility(item.id)"
+              :disabled="isSaving"
+            >
+              <i :class="['ph', item.visible ? 'ph-eye' : 'ph-eye-slash', 'text-lg']"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -94,4 +112,3 @@ const onDrop = (targetIndex: number) => {
     </div>
   </div>
 </template>
-

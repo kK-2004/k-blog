@@ -1,0 +1,268 @@
+/**
+ * Element Plus 现代化自定义样式
+ * macOS 风格设计 - 优化版本
+ */
+
+/* ==================== ElMessage ==================== */
+.el-message {
+  --el-message-bg-color: rgba(255, 255, 255, 0.95);
+  --el-message-border-color: rgba(0, 0, 0, 0.08);
+  --el-message-padding: 12px 16px;
+  --el-message-radius: 12px;
+  --el-message-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12),
+  0 2px 8px rgba(0, 0, 0, 0.08);
+  --el-message-font-size: 14px;
+  --el-message-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  background: var(--el-message-bg-color);
+  border: 1px solid var(--el-message-border-color);
+  border-radius: var(--el-message-radius);
+  box-shadow: var(--el-message-box-shadow);
+  padding: var(--el-message-padding);
+  font-size: var(--el-message-font-size);
+  backdrop-filter: blur(20px);
+  transition: var(--el-message-transition);
+
+  /* macOS 风格优化 - 更紧凑 */
+  min-width: auto;
+  max-width: 320px;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* 暗色模式 */
+.dark .el-message {
+  --el-message-bg-color: rgba(30, 30, 30, 0.95);
+  --el-message-border-color: rgba(255, 255, 255, 0.1);
+  --el-message-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+  0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 成功消息 */
+.el-message--success {
+  background: linear-gradient(
+          135deg,
+          rgba(34, 197, 94, 0.95) 0%,
+          rgba(16, 185, 129, 0.95) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.el-message--success .el-message__content {
+  color: white;
+  font-weight: 500;
+}
+
+.el-message--success .el-message__icon {
+  color: white;
+}
+
+/* 错误消息 */
+.el-message--error {
+  background: linear-gradient(
+          135deg,
+          rgba(239, 68, 68, 0.95) 0%,
+          rgba(220, 38, 38, 0.95) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.el-message--error .el-message__content {
+  color: white;
+  font-weight: 500;
+}
+
+.el-message--error .el-message__icon {
+  color: white;
+}
+
+/* 警告消息 */
+.el-message--warning {
+  background: linear-gradient(
+          135deg,
+          rgba(251, 146, 60, 0.95) 0%,
+          rgba(249, 115, 22, 0.95) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.el-message--warning .el-message__content {
+  color: white;
+  font-weight: 500;
+}
+
+.el-message--warning .el-message__icon {
+  color: white;
+}
+
+/* 信息消息 */
+.el-message--info {
+  background: linear-gradient(
+          135deg,
+          rgba(59, 130, 246, 0.95) 0%,
+          rgba(37, 99, 235, 0.95) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.el-message--info .el-message__content {
+  color: white;
+  font-weight: 500;
+}
+
+.el-message--info .el-message__icon {
+  color: white;
+}
+
+/* 图标大小优化 */
+.el-message .el-message__icon {
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+/* 关闭按钮样式 - 更明显 */
+.el-message__closeBtn {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  margin-left: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white !important;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.el-message__closeBtn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.el-message__closeBtn:active {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(0.95);
+}
+
+/* 默认消息的关闭按钮 */
+.el-message:not(.el-message--success):not(.el-message--error):not(.el-message--warning):not(.el-message--info) .el-message__closeBtn {
+  background: rgba(0, 0, 0, 0.06);
+  color: #6b7280;
+}
+
+.el-message:not(.el-message--success):not(.el-message--error):not(.el-message--warning):not(.el-message--info) .el-message__closeBtn:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #374151;
+}
+
+.dark .el-message:not(.el-message--success):not(.el-message--error):not(.el-message--warning):not(.el-message--info) .el-message__closeBtn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+}
+
+.dark .el-message:not(.el-message--success):not(.el-message--error):not(.el-message--warning):not(.el-message--info) .el-message__closeBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #f3f4f6;
+}
+
+/* ==================== ElMessageBox ==================== */
+.el-message-box {
+  --el-messagebox-border-radius: 16px;
+  --el-messagebox-padding: 24px;
+
+  border-radius: var(--el-messagebox-border-radius);
+  padding: var(--el-messagebox-padding);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.dark .el-message-box {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.el-message-box__header {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .el-message-box__header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.el-message-box__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.dark .el-message-box__title {
+  color: #f3f4f6;
+}
+
+.el-message-box__content {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dark .el-message-box__content {
+  color: #d1d5db;
+}
+
+.el-message-box__btns {
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+/* 按钮样式优化 */
+.el-button--primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.el-button--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.el-button--default {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.el-button--default:hover {
+  transform: translateY(-1px);
+}
+
+/* ==================== 动画优化 ==================== */
+.el-message-fade-enter-from,
+.el-message-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+.el-message-fade-enter-to,
+.el-message-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 768px) {
+  .el-message {
+    max-width: calc(100vw - 32px);
+    margin: 0 16px;
+  }
+}

@@ -1,0 +1,205 @@
+/* Markdown 代码块样式 */
+.markdown-code-block {
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 代码块头部 */
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 语言标识 */
+.code-language {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.05em;
+}
+
+/* 复制按钮 */
+.code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.375rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.code-copy-btn:active {
+  transform: scale(0.95);
+}
+
+/* 复制成功状态 */
+.code-copy-btn.copied {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #22c55e;
+}
+
+.code-copy-btn.copied svg {
+  stroke: #22c55e;
+}
+
+/* 代码区域 */
+.markdown-code-block pre {
+  margin: 0 !important;
+  padding: 1rem !important;
+  background: transparent !important;
+  overflow-x: auto;
+}
+
+.markdown-code-block pre code {
+  font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #e5e7eb;
+  background: transparent !important;
+}
+
+/* 自定义滚动条 */
+.markdown-code-block pre::-webkit-scrollbar {
+  height: 0.5rem;
+}
+
+.markdown-code-block pre::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.markdown-code-block pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 0.25rem;
+}
+
+.markdown-code-block pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 深色模式适配 */
+.dark .markdown-code-block {
+  background: #0d0d0d;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark .code-block-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark .code-language {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dark .code-copy-btn {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dark .code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 亮色模式适配 */
+html:not(.dark) .markdown-code-block {
+  background: #f6f8fa;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark) .code-block-header {
+  background: #ffffff;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+html:not(.dark) .code-language {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+html:not(.dark) .code-copy-btn {
+  border-color: rgba(0, 0, 0, 0.15);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+html:not(.dark) .code-copy-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.8);
+}
+
+html:not(.dark) .markdown-code-block pre code {
+  color: #24292f;
+}
+
+html:not(.dark) .markdown-code-block pre::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html:not(.dark) .markdown-code-block pre::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+html:not(.dark) .markdown-code-block pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .code-language {
+    font-size: 0.625rem;
+  }
+
+  .code-copy-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.625rem;
+  }
+
+  .markdown-code-block pre code {
+    font-size: 0.8125rem;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.code-copy-btn .copy-text {
+  transition: all 0.2s ease;
+}
+
+/* macOS 风格优化 */
+.markdown-code-block {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.dark .markdown-code-block {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
-import type { Post } from '@/data/initialPosts'
+import type { Post } from '@/api/types'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import { useReadStats } from '@/composables/useReadStats'
 import AvatarCircle from './AvatarCircle.vue'
+import { incrementComments, incrementLikes, incrementViews } from '@/api/posts'
 
 type ReplyItem = {
   id: number
@@ -70,14 +71,39 @@ const repliesState = ref<Record<number, ReplyPagingState>>({})
 const localArticleLikes = ref(props.post.likes)
 const hasLikedArticle = ref(false)
 const likeBouncing = ref(false)
+const hasCountedView = ref(false)
+
+watch(
+  () => props.post.likes,
+  (likes) => {
+    if (!hasLikedArticle.value) localArticleLikes.value = likes
+  },
+)
 
 const summary = ref('')
 const displayedSummary = ref('')
 const isGenerating = ref(false)
+const isStreamingSummary = ref(false)
+const hasReceivedSummaryData = ref(false) // 是否已收到流式响应数据
 let summaryRequestId = 0
-let typingTimer: number | undefined
 
 const geminiGradientId = computed(() => `gemini_grad_${props.post.id}`)
+
+// 渲染 AI 摘要为 Markdown
+const renderedSummaryHtml = computed(() => {
+  // 如果正在流式输出，返回纯文本（不渲染 Markdown，让光标能跟随）
+  if (isStreamingSummary.value) {
+    return displayedSummary.value
+  }
+  // 流式输出完成后，直接渲染 Markdown（不等待打字效果）
+  return renderMarkdown(displayedSummary.value)
+})
+
+// 判断是否应该显示 Markdown
+const shouldRenderMarkdown = computed(() => {
+  // 只要不正在流式输出且已有内容，就渲染 Markdown
+  return !isStreamingSummary.value && displayedSummary.value.length > 0
+})
 
 const showExpandBtn = computed(() => {
   const text = props.post.content || ''
@@ -306,6 +332,7 @@ const collapse = () => {
     if (!isVisuallyExpanded.value) {
       summary.value = ''
       displayedSummary.value = ''
+      hasReceivedSummaryData.value = false // 重置数据接收状态
     }
   }, SUMMARY_COLLAPSE_MS)
   window.setTimeout(() => {
@@ -317,6 +344,10 @@ const expand = () => {
   if (!isExpanded.value) isExpanded.value = true
   isVisuallyExpanded.value = true
   window.dispatchEvent(new CustomEvent(EXPAND_EVENT, { detail: { id: props.post.id } }))
+  if (!hasCountedView.value) {
+    hasCountedView.value = true
+    void incrementViews(props.post.id).catch(() => {})
+  }
   void scrollCardToCenter({ durationMs: EXPAND_COLLAPSE_MS })
   window.setTimeout(() => {
     if (!isVisuallyExpanded.value) return
@@ -334,13 +365,14 @@ const toggleExpand = () => {
 }
 
 const handleArticleLike = () => {
-  if (!hasLikedArticle.value) {
-    localArticleLikes.value += 1
-    hasLikedArticle.value = true
-  } else {
-    localArticleLikes.value -= 1
+  if (hasLikedArticle.value) return
+
+  localArticleLikes.value += 1
+  hasLikedArticle.value = true
+  void incrementLikes(props.post.id).catch(() => {
+    localArticleLikes.value = Math.max(0, localArticleLikes.value - 1)
     hasLikedArticle.value = false
-  }
+  })
 
   likeBouncing.value = true
   window.setTimeout(() => {
@@ -417,6 +449,7 @@ const submitComment = async () => {
   }
 
   draftText.value = ''
+  void incrementComments(props.post.id).catch(() => {})
   await scrollToCommentById(newId)
 }
 
@@ -429,46 +462,62 @@ const generateAiSummary = async () => {
 
   const requestId = (summaryRequestId += 1)
   displayedSummary.value = ''
+  summary.value = ''
   isGenerating.value = true
+  isStreamingSummary.value = true
+  hasReceivedSummaryData.value = false // 重置：还未收到数据
 
   try {
-    const res = await fetch('/api/ai/summary', {
+    const res = await fetch('/api/ai/summary/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: props.post.content }),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = (await res.json()) as { summary?: string }
+    if (!res.body) throw new Error('No response body')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let acc = ''
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      if (requestId !== summaryRequestId) {
+        try {
+          await reader.cancel()
+        } catch {
+          // ignore
+        }
+        return
+      }
+
+      const chunk = decoder.decode(value, { stream: true })
+      if (!chunk) continue
+      acc += chunk
+      displayedSummary.value = acc
+      hasReceivedSummaryData.value = true // 已收到数据
+      // 不要在这里设置 isGenerating = false，应该在整个流式输出完成后才设置
+    }
+
     if (requestId !== summaryRequestId) return
-    summary.value = data.summary || '无法生成摘要'
+    const finalText = acc.trim() || '无法生成摘要'
+    displayedSummary.value = finalText
+    summary.value = finalText
   } catch {
     if (requestId !== summaryRequestId) return
     await new Promise((r) => setTimeout(r, 1200))
     summary.value =
-      '（演示模式：本地 /api/ai/summary 不可用）\n这是一段模拟摘要。你可以把摘要服务替换成真实的 Gemini / OpenAI 接口。'
+      '（演示模式：本地 /api/ai/summary/stream 不可用）\n这是一段模拟摘要。你可以把摘要服务替换成真实的 GLM / OpenAI 接口。'
+    displayedSummary.value = summary.value
+    hasReceivedSummaryData.value = true // 模拟数据也算收到数据
   } finally {
-    if (requestId === summaryRequestId) isGenerating.value = false
+    if (requestId === summaryRequestId) {
+      isGenerating.value = false
+      isStreamingSummary.value = false
+    }
   }
 }
-
-watch(
-  summary,
-  (val) => {
-    if (typingTimer) window.clearTimeout(typingTimer)
-    displayedSummary.value = ''
-    if (!val) return
-
-    const tick = () => {
-      if (summary.value !== val) return
-      if (displayedSummary.value.length >= val.length) return
-      displayedSummary.value = val.slice(0, displayedSummary.value.length + 1)
-      typingTimer = window.setTimeout(tick, 15)
-    }
-
-    typingTimer = window.setTimeout(tick, 60)
-  },
-  { flush: 'post' },
-)
 
 let autoCollapseRaf = 0
 const checkAutoCollapse = () => {
@@ -516,7 +565,6 @@ onUnmounted(() => {
   window.removeEventListener('scroll', onWindowScroll)
   if (autoCollapseRaf) window.cancelAnimationFrame(autoCollapseRaf)
   if (innerScrollRaf) window.cancelAnimationFrame(innerScrollRaf)
-  if (typingTimer) window.clearTimeout(typingTimer)
   stopCenterScroll()
 })
 </script>
@@ -544,7 +592,40 @@ onUnmounted(() => {
           <i class="ph ph-file-text"></i>
           {{ post.title }}
         </div>
-        <div class="w-10"></div>
+        <div class="w-10 flex justify-end">
+          <svg
+            v-if="post.pinned"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="text-red-500"
+            title="置顶"
+          >
+            <path
+              d="M16.5 3.5L12 7L7.5 3.5V3.5C7.5 2.67 8.17 2 9 2H15C15.83 2 16.5 2.67 16.5 3.5V3.5Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M12 7V22"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M9 12H15"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
       </div>
 
       <div class="relative flex-1">
@@ -636,17 +717,28 @@ onUnmounted(() => {
                 </div>
 
                 <div class="text-[14px] leading-relaxed text-gray-700 dark:text-gray-300 font-medium">
-                  <div v-if="isGenerating" class="space-y-2">
+                  <!-- 加载动画：只在还未收到任何响应时显示 -->
+                  <div v-show="!hasReceivedSummaryData" class="space-y-2">
                     <div class="h-3 bg-gray-200 dark:bg-white/10 rounded w-full animate-pulse"></div>
                     <div class="h-3 bg-gray-200 dark:bg-white/10 rounded w-[80%] animate-pulse"></div>
                   </div>
-                  <p v-else class="whitespace-pre-wrap mac-summary-reveal">
-                    {{ displayedSummary }}
-                    <span
-                      v-if="displayedSummary.length < summary.length"
-                      class="inline-block w-1.5 h-4 ml-1 bg-blue-400 animate-pulse align-middle rounded-sm"
-                    ></span>
-                  </p>
+
+                  <!-- 内容显示：收到数据后显示 -->
+                  <div v-show="hasReceivedSummaryData" class="mac-summary-reveal">
+                    <!-- Markdown 渲染：流式输出完成后显示 -->
+                    <div v-if="shouldRenderMarkdown" class="markdown-content prose prose-sm dark:prose-invert max-w-none">
+                      <div v-html="renderedSummaryHtml"></div>
+                    </div>
+
+                    <!-- 纯文本 + 光标：流式输出时显示 -->
+                    <div v-else>
+                      <p class="whitespace-pre-wrap">
+                        {{ displayedSummary }}<span
+                          class="inline-block w-1.5 h-4 ml-0.5 bg-blue-400 animate-pulse align-middle rounded-sm"
+                        ></span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex justify-end">
@@ -864,7 +956,7 @@ onUnmounted(() => {
 }
 
 .mac-summary--open {
-  max-height: 360px;
+  max-height: 460px;
   opacity: 1;
   margin-top: 0.75rem;
 }

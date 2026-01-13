@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import AdminLogin from '@/components/mac/AdminLogin.vue'
+import type { AdminMe } from '@/api/types'
 
 defineEmits<{
-  (e: 'login-success'): void
+  (e: 'login-success', me: AdminMe): void
 }>()
 </script>
 
 <template>
-  <AdminLogin @login-success="$emit('login-success')" />
+  <AdminLogin @login-success="(me) => $emit('login-success', me)" />
 </template>
-

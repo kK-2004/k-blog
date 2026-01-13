@@ -1,7 +1,28 @@
 <script setup lang="ts">
-defineEmits<{
-  (e: 'login-success'): void
+import { ref } from 'vue'
+import { login } from '@/api/admin'
+import type { AdminMe } from '@/api/types'
+
+const emit = defineEmits<{
+  (e: 'login-success', me: AdminMe): void
 }>()
+
+const password = ref('')
+const loading = ref(false)
+
+const onSubmit = async () => {
+  if (!password.value.trim() || loading.value) return
+  loading.value = true
+  try {
+    const me = await login(password.value.trim())
+    emit('login-success', me)
+    password.value = ''
+  } catch (e: any) {
+    // 错误已在 http.ts 中通过 ElMessage 统一处理
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -18,15 +39,18 @@ defineEmits<{
           type="password"
           placeholder="Password"
           class="w-full px-4 py-2 bg-white dark:bg-black/20 border border-gray-300 dark:border-gray-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+          v-model="password"
+          @keyup.enter="onSubmit"
         />
         <button
           class="w-full bg-[#007AFF] hover:bg-[#0062cc] text-white py-2 rounded-lg text-sm font-medium shadow-lg"
-          @click="$emit('login-success')"
+          :disabled="loading || !password.trim()"
+          :class="loading ? 'opacity-70 cursor-not-allowed' : ''"
+          @click="onSubmit"
         >
-          Enter
+          {{ loading ? 'Signing in...' : 'Enter' }}
         </button>
       </div>
     </div>
   </div>
 </template>
-

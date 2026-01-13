@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Post } from '@/data/initialPosts'
+import type { Post } from '@/api/types'
 import AdminEditor from './AdminEditor.vue'
-import AvatarCircle from './AvatarCircle.vue'
+import ProfileCenter from '@/views/ProfileCenter.vue'
+import { createPost, deletePost as apiDeletePost, listPosts, updatePost } from '@/api/posts'
 
 const props = defineProps<{
   posts: Post[]
 }>()
 
+const emit = defineEmits<{
+  (e: 'update:posts', posts: Post[]): void
+  (e: 'refresh'): void
+}>()
+
+// 当前视图：posts 或 profile
+const currentView = ref<'posts' | 'profile'>('posts')
+
 const isEditorOpen = ref(false)
 const currentEditId = ref<number | null>(null)
 const editorContent = ref('')
+const isCreating = ref(false)
 
 const openEditor = (post: Post) => {
   currentEditId.value = post.id
@@ -18,68 +28,178 @@ const openEditor = (post: Post) => {
   isEditorOpen.value = true
 }
 
+const openCreate = () => {
+  isCreating.value = true
+  currentEditId.value = null
+  editorContent.value = ''
+  isEditorOpen.value = true
+}
+
 const closeEditor = () => {
   isEditorOpen.value = false
   currentEditId.value = null
+  isCreating.value = false
 }
 
-const savePost = (newContent: string) => {
+const refreshPosts = async () => {
+  const posts = await listPosts()
+  emit('update:posts', posts)
+  emit('refresh')
+}
+
+const savePost = async (newContent: string) => {
+  if (isCreating.value) {
+    const title = window.prompt('Title?')?.trim()
+    if (!title) return
+    const author = window.prompt('Author?')?.trim() || 'Admin'
+    await createPost({ title, author, content: newContent, time: '刚刚', pinned: false })
+    await refreshPosts()
+    closeEditor()
+    return
+  }
+
   const post = props.posts.find((p) => p.id === currentEditId.value)
-  if (post) post.content = newContent
+  if (!post) return
+  await updatePost(post.id, { ...post, content: newContent })
+  await refreshPosts()
   closeEditor()
+}
+
+const togglePin = async (postId: number) => {
+  const post = props.posts.find((p) => p.id === postId)
+  if (post) {
+    await updatePost(post.id, { ...post, pinned: !post.pinned })
+    await refreshPosts()
+  }
+}
+
+const deletePost = async (postId: number) => {
+  if (!window.confirm('Delete this post?')) return
+  await apiDeletePost(postId)
+  await refreshPosts()
+}
+
+const formatNumber = (num: number): string => {
+  if (num >= 10000) {
+    return (num / 10000).toFixed(1) + 'w'
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'k'
+  }
+  return num.toString()
 }
 </script>
 
 <template>
-  <div class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden min-h-[500px]">
-    <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-6 justify-between">
-      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-        <i class="ph ph-squares-four text-lg"></i>
-        Dashboard
-      </h2>
-      <div class="flex gap-2 items-center">
-        <span class="text-[10px] text-gray-500 uppercase tracking-widest bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-0.5 rounded">Live</span>
+  <div class="divide-y-6">
+    <!-- 顶部导航 -->
+    <div class="mb-4 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
+      <div class="flex">
+        <button
+          class="flex-1 py-4 px-6 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          :class="currentView === 'posts'
+            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+          @click="currentView = 'posts'"
+        >
+          <i class="ph ph-squares-four text-lg"></i>
+          文章管理
+        </button>
+        <button
+          class="flex-1 py-4 px-6 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          :class="currentView === 'profile'
+            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+          @click="currentView = 'profile'"
+        >
+          <i class="ph ph-user-gear text-lg"></i>
+          个人中心
+        </button>
       </div>
     </div>
 
-    <div class="p-0 overflow-x-auto">
-      <table class="w-full text-left border-collapse">
-        <thead>
+    <!-- 文章管理视图 -->
+    <div v-if="currentView === 'posts'" class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden min-h-[500px]">
+      <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-6 justify-between">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          <i class="ph ph-squares-four text-lg"></i>
+          文章列表
+        </h2>
+        <button class="px-2.5 py-1 text-[10px] rounded bg-[#007AFF] text-white hover:opacity-90 shadow" @click="openCreate">
+          New Post
+        </button>
+      </div>
+
+      <div class="p-0 overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
           <tr class="border-b border-gray-100 dark:border-white/10 text-xs text-gray-400 font-medium uppercase tracking-wider">
             <th class="p-4 pl-6">Title</th>
-            <th class="p-4">Author</th>
-            <th class="p-4 text-right">Stats</th>
+            <th class="p-4 text-center">Stats</th>
             <th class="p-4 text-center pr-6">Action</th>
           </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-50 dark:divide-white/5">
-          <tr v-for="post in props.posts" :key="post.id" class="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors group">
+          </thead>
+          <tbody class="divide-y divide-gray-50 dark:divide-white/5">
+          <tr
+              v-for="post in props.posts"
+              :key="post.id"
+              class="transition-colors group"
+              :class="{
+                'hover:bg-blue-50/50 dark:hover:bg-blue-900/10': !post.pinned,
+                'bg-amber-50/30 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20': post.pinned
+              }"
+          >
             <td class="p-4 pl-6">
-              <div class="font-medium text-gray-800 dark:text-gray-200 text-sm">{{ post.title }}</div>
+              <div class="flex items-center gap-2">
+                <div class="font-medium text-gray-800 dark:text-gray-200 text-sm">{{ post.title }}</div>
+              </div>
               <div class="text-xs text-gray-400 truncate w-48">{{ post.content.substring(0, 30) }}...</div>
             </td>
-            <td class="p-4 text-sm text-gray-600 dark:text-gray-400">
-              <div class="flex items-center gap-2">
-                <AvatarCircle :name="post.author" size="sm" />
-                {{ post.author }}
+            <td class="p-4 text-right">
+              <div class="flex items-center justify-center gap-4">
+                <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 transition-all hover:bg-blue-100/70 dark:hover:bg-blue-500/20">
+                  <i class="ph ph-eye text-blue-500 dark:text-blue-400 text-sm"></i>
+                  <span class="text-xs font-semibold text-blue-600 dark:text-blue-400 min-w-[2.5rem] text-right">{{ formatNumber(post.views) }}</span>
+                </div>
+                <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50/50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 transition-all hover:bg-rose-100/70 dark:hover:bg-rose-500/20">
+                  <i class="ph ph-heart text-rose-500 dark:text-rose-400 text-sm"></i>
+                  <span class="text-xs font-semibold text-rose-600 dark:text-rose-400 min-w-[2.5rem] text-right">{{ formatNumber(post.likes) }}</span>
+                </div>
+                <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 transition-all hover:bg-emerald-100/70 dark:hover:bg-emerald-500/20">
+                  <i class="ph ph-chat-circle text-emerald-500 dark:text-emerald-400 text-sm"></i>
+                  <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 min-w-[2.5rem] text-right">{{ formatNumber(post.comments) }}</span>
+                </div>
               </div>
             </td>
-            <td class="p-4 text-right">
-              <div class="text-xs text-gray-500 dark:text-gray-400 font-mono">{{ post.views }} views</div>
-            </td>
             <td class="p-4 pr-6 text-center">
-              <button class="p-2 text-blue-500 hover:bg-blue-100 rounded dark:hover:bg-blue-900/30 transition-colors" title="Edit Fullscreen" @click="openEditor(post)">
-                <i class="ph ph-arrows-out-simple"></i>
-              </button>
+              <div class="flex items-center justify-center gap-1">
+                <button
+                    class="p-2 transition-colors rounded"
+                    :class="post.pinned ? 'text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
+                    title="置顶"
+                    @click="togglePin(post.id)"
+                >
+                  <i class="ph ph-push-pin"></i>
+                </button>
+                <button class="p-2 text-blue-500 hover:bg-blue-100 rounded dark:hover:bg-blue-900/30 transition-colors" title="编辑" @click="openEditor(post)">
+                  <i class="ph ph-pencil-simple"></i>
+                </button>
+                <button class="p-2 text-red-500 hover:bg-red-100 rounded dark:hover:bg-red-900/30 transition-colors" title="删除" @click="deletePost(post.id)">
+                  <i class="ph ph-trash"></i>
+                </button>
+              </div>
             </td>
           </tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
+
+      <Teleport to="body">
+        <AdminEditor :isOpen="isEditorOpen" :initialContent="editorContent" @close="closeEditor" @save="savePost" />
+      </Teleport>
     </div>
 
-    <Teleport to="body">
-      <AdminEditor :isOpen="isEditorOpen" :initialContent="editorContent" @close="closeEditor" @save="savePost" />
-    </Teleport>
+    <!-- 个人中心视图 -->
+    <ProfileCenter v-else />
   </div>
 </template>
-

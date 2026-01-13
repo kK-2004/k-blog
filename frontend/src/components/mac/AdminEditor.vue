@@ -15,6 +15,7 @@ const emit = defineEmits<{
 const content = ref(props.initialContent || '')
 const previewMode = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const codeMenuOpen = ref(false)
 
 watch(
   () => props.initialContent,
@@ -72,17 +73,41 @@ const insertImage = () => insertText('![Image Description](', ')')
         </button>
         <div class="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
 
-        <div class="relative group">
+        <div class="relative group/code-menu" @mouseenter="codeMenuOpen = true" @mouseleave="codeMenuOpen = false">
           <button class="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1 text-gray-600 dark:text-gray-300">
             <i class="ph ph-code"></i>
             <i class="ph ph-caret-down text-[10px]"></i>
           </button>
+          <!-- 不可见的桥接层，连接按钮和菜单 -->
+          <div class="absolute top-full left-0 h-1 w-full -mt-1" v-show="codeMenuOpen"></div>
           <div
-            class="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-[#333] shadow-xl rounded-lg border border-gray-100 dark:border-black py-1 hidden group-hover:block z-50"
+            class="absolute top-full left-0 w-40 bg-white dark:bg-[#333] shadow-xl rounded-lg border border-gray-100 dark:border-black py-1 z-50"
+            :class="codeMenuOpen ? 'block' : 'hidden'"
+            @mouseenter="codeMenuOpen = true"
+            @mouseleave="codeMenuOpen = false"
           >
             <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('javascript')">
               JavaScript
             </button>
+            <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('typescript')">
+              TypeScript
+            </button>
+            <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('python')">
+              Python
+            </button>
+            <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('java')">
+              Java
+            </button>
+            <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('go')">
+              Go
+            </button>
+            <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('cpp')">
+              C++
+            </button>
+            <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('c')">
+              C
+            </button>
+            <div class="h-px bg-gray-200 dark:bg-gray-600 my-1"></div>
             <button class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-xs dark:text-gray-300" @click="insertCode('html')">
               HTML
             </button>

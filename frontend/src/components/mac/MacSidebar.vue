@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useHashRouter } from '@/composables/useHashRouter'
-import { useSidebarConfig } from '@/composables/useSidebarConfig'
+import { useBackendSidebarConfig } from '@/composables/useBackendSidebarConfig'
 
 const props = defineProps<{
   isOpen: boolean
@@ -10,7 +10,8 @@ const props = defineProps<{
 }>()
 
 const { navigateTo } = useHashRouter()
-const { visibleMenuItems } = useSidebarConfig()
+const { visibleMenuItems, loadConfig } = useBackendSidebarConfig()
+void loadConfig()
 
 // 根据认证状态过滤可见菜单项
 const filteredMenuItems = computed(() => {

@@ -15,6 +15,8 @@ export type Post = {
   hotComment: HotComment | null
   views: number
   likes: number
+  comments: number
+  pinned: boolean
 }
 
 export const INITIAL_POSTS: Post[] = [
@@ -56,6 +58,8 @@ const app = createApp({
     hotComment: null,
     views: 1204,
     likes: 85,
+    comments: 12,
+    pinned: false,
   },
   {
     id: 2,
@@ -75,6 +79,8 @@ const app = createApp({
     },
     views: 892,
     likes: 124,
+    comments: 8,
+    pinned: false,
   },
   {
     id: 3,
@@ -99,5 +105,7 @@ docker run -d -p 80:80 nginx
     },
     views: 562,
     likes: 42,
+    comments: 5,
+    pinned: false,
   },
 ]

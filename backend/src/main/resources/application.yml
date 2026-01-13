@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: k-blog-backend
+  profiles:
+    default: dev
+
+server:
+  port: 8087
+
+app:
+  cors:
+    allowed-origins: "http://localhost:5173,http://localhost:4173"
+  ip:
+    fastapi:
+      enabled: true
+      url-template: "http://127.0.0.1:9000/resolve?ip={ip}"
+      connect-timeout-ms: 800
+      read-timeout-ms: 1200
+  ai:
+    glm:
+      api-key: ${GLM_API_KEY:}
+      model: ${GLM_MODEL:glm-4-flash}
+      base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
+      timeout-seconds: ${GLM_TIMEOUT_SECONDS:60}

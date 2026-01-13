@@ -71,6 +71,15 @@ export function useSidebarConfig() {
     }
   }
 
+  // 切换菜单项是否需要登录
+  const toggleRequiresAuth = (id: string) => {
+    const item = menuItems.value.find(i => i.id === id)
+    if (item) {
+      item.requiresAuth = !item.requiresAuth
+      saveConfig()
+    }
+  }
+
   // 更新菜单项排序
   const reorderItems = (items: MenuItem[]) => {
     menuItems.value = items.map((item, index) => ({
@@ -90,6 +99,7 @@ export function useSidebarConfig() {
     visibleMenuItems,
     allMenuItems,
     toggleVisibility,
+    toggleRequiresAuth,
     reorderItems,
     resetToDefault,
     loadConfig

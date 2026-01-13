@@ -10,6 +10,14 @@ export function useTheme() {
   const applyThemeClass = (mode: ThemeMode) => {
     document.documentElement.classList.remove('light', 'dark')
     document.documentElement.classList.add(mode)
+
+    // 动态切换 highlight.js 主题
+    const hljsThemeLink = document.getElementById('hljs-theme') as HTMLLinkElement
+    if (hljsThemeLink) {
+      hljsThemeLink.href = mode === 'dark'
+        ? 'https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css'
+        : 'https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css'
+    }
   }
 
   const toggleTheme = () => {
