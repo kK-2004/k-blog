@@ -4,21 +4,33 @@
  */
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { uploadAvatar as apiUploadAvatar, deleteAvatar as apiDeleteAvatar, getAvatarInfo } from '@/services/avatarApi'
+import { me as apiMe } from '@/api/admin'
+import { getPublicProfile } from '@/api/site'
+import { uploadAvatar as apiUploadAvatar, deleteAvatar as apiDeleteAvatar } from '@/services/avatarApi'
 
 // 全局状态
 const avatarUrl = ref<string | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
-export function useUserAvatar() {
+export function useUserAvatar(isAuthenticated: boolean) {
   // 从服务器加载头像信息
   const loadAvatar = async () => {
     try {
       isLoading.value = true
       error.value = null
-      const info = await getAvatarInfo()
-      avatarUrl.value = info.url
+
+      // 根据登录状态调用不同的 API
+      if (isAuthenticated) {
+        // 已登录：从 /api/admin/me 获取
+        const admin = await apiMe()
+        avatarUrl.value = admin.avatarUrl
+      } else {
+        // 未登录：从 /api/site/profile 获取
+        const profile = await getPublicProfile()
+        avatarUrl.value = profile.avatarUrl
+      }
+
       return true
     } catch (e) {
       const message = e instanceof Error ? e.message : '加载头像失败'

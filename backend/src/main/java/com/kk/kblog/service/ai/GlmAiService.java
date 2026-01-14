@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -25,10 +26,16 @@ public class GlmAiService {
     private final GlmProperties props;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final String summaryPrompt;
 
-    public GlmAiService(GlmProperties props, ObjectMapper objectMapper) {
+    public GlmAiService(
+            GlmProperties props,
+            ObjectMapper objectMapper,
+            @Value("${app.ai.summary_prompt:}") String summaryPrompt
+    ) {
         this.props = props;
         this.objectMapper = objectMapper;
+        this.summaryPrompt = summaryPrompt;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(Math.max(1, props.getTimeoutSeconds())))
                 .build();
@@ -40,7 +47,7 @@ public class GlmAiService {
 
     public String summarize(String content) {
         if (!isEnabled()) {
-            log.info("GLM disabled, using fallback summary");
+            log.warn("GLM disabled, using fallback summary");
             return fallbackSummary(content);
         }
 
@@ -50,7 +57,11 @@ public class GlmAiService {
                 .build();
 
         try {
-            log.info("GLM summarize request: model={}, url={}", props.getModel(), props.getBaseUrl());
+            log.info("GLM summarize request: model={}, url={}, promptLen={}, contentLen={}",
+                    props.getModel(),
+                    props.getBaseUrl(),
+                    summaryPrompt.length(),
+                    content == null ? 0 : content.length());
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() / 100 != 2) {
                 throw new IOException("GLM API error: HTTP " + response.statusCode() + " body=" + safeBodySnippet(response.body()));
@@ -80,7 +91,11 @@ public class GlmAiService {
                 .POST(HttpRequest.BodyPublishers.ofString(reqBody, StandardCharsets.UTF_8))
                 .build();
 
-        log.info("GLM stream request: model={}, url={}", props.getModel(), props.getBaseUrl());
+        log.info("GLM stream request: model={}, url={}, promptLen={}, contentLen={}",
+                props.getModel(),
+                props.getBaseUrl(),
+                summaryPrompt.length(),
+                content == null ? 0 : content.length());
         var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() / 100 != 2) {
             log.warn("GLM stream error: HTTP {}", response.statusCode());
@@ -127,9 +142,10 @@ public class GlmAiService {
     }
 
     private String fallbackSummary(String content) {
-        var safe = content == null ? "" : content.trim();
-        if (safe.isBlank()) return "";
-        return safe.length() <= 120 ? safe : safe.substring(0, 120) + "...";
+//        var safe = content == null ? "" : content.trim();
+//        if (safe.isBlank()) return "";
+//        return safe.length() <= 120 ? safe : safe.substring(0, 120) + "...";
+        return "LLM Api 并发限流 暂时无法使用~";
     }
 
     private HttpRequest.Builder baseRequest() {
@@ -146,15 +162,24 @@ public class GlmAiService {
         root.put("stream", stream);
 
         ArrayNode messages = root.putArray("messages");
-        messages.addObject()
-                .put("role", "system")
-                .put("content", "你是一个文章摘要助手。请基于用户提供的内容生成中文摘要：\n1) 4-8 行\n2) 重点突出、信息密度高\n3) 不要编造不存在的事实\n4) 可以使用项目符号");
+        if (!summaryPrompt.isBlank()) {
+            messages.addObject()
+                    .put("role", "system")
+                    .put("content", summaryPrompt);
+        }
+
         messages.addObject()
                 .put("role", "user")
                 .put("content", content == null ? "" : content);
 
         return root.toString();
     }
+
+//    private String effectivePrompt() {
+//        var prompt = props.getPrompt() == null ? "" : props.getPrompt().trim();
+//        if (!prompt.isBlank()) return prompt;
+//        return summaryPrompt == null ? "" : summaryPrompt.trim();
+//    }
 
     private String safeBodySnippet(String body) {
         if (body == null) return "";

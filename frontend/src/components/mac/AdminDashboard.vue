@@ -51,8 +51,11 @@ const savePost = async (newContent: string) => {
   if (isCreating.value) {
     const title = window.prompt('Title?')?.trim()
     if (!title) return
-    const author = window.prompt('Author?')?.trim() || 'Admin'
-    await createPost({ title, author, content: newContent, time: '刚刚', pinned: false })
+    if (!newContent?.trim()) {
+      window.alert('内容不能为空')
+      return
+    }
+    await createPost({ title, content: newContent, pinned: false })
     await refreshPosts()
     closeEditor()
     return

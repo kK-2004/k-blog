@@ -23,7 +23,7 @@ public class GlmProperties {
     /**
      * Model name, e.g. `glm-4-flash` / `glm-4`.
      */
-    private String model = "glm-4.5-flash";
+    private String model = "glm-4-flash";
 
     /**
      * Request timeout in seconds.
@@ -31,4 +31,3 @@ public class GlmProperties {
     private int timeoutSeconds = 60;
 
 }
-

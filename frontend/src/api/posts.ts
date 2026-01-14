@@ -2,12 +2,9 @@ import { apiFetch } from './http'
 import type { Post } from './types'
 
 export type CreatePostRequest = {
-  author: string
   title: string
-  time?: string
   content: string
   pinned?: boolean
-  hotComment?: Post['hotComment']
 }
 
 export async function listPosts(): Promise<Post[]> {
@@ -39,6 +36,5 @@ export async function incrementLikes(id: number): Promise<Post> {
 }
 
 export async function incrementComments(id: number): Promise<Post> {
-  return apiFetch<Post>(`/api/posts/${id}/comments`, { method: 'POST' })
+  return apiFetch<Post>(`/api/posts/${id}/comments/increment`, { method: 'POST' })
 }
-

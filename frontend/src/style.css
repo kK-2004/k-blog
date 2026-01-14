@@ -17,6 +17,16 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+
 /* Minimal Markdown styling (to match the HTML demo) */
 .prose h1 {
   font-size: 1.5em;
@@ -86,4 +96,77 @@
   max-width: 100%;
   border-radius: 8px;
   margin: 1em 0;
+}
+
+/* ========================================
+   文章详情页样式
+   ======================================== */
+
+/* 平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 标题锚点偏移（避免被固定头部遮挡） */
+.prose h1[id],
+.prose h2[id],
+.prose h3[id],
+.prose h4[id],
+.prose h5[id],
+.prose h6[id] {
+  scroll-margin-top: 6rem;
+}
+
+/* 移动端底部安全区域 */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 滚动进度条动画 */
+.scroll-progress-bar {
+  transition: width 150ms ease-out;
+}
+
+/* 目录导航样式 */
+.article-toc a {
+  @apply transition-colors duration-200;
+}
+
+/* 增强的 prose 样式（用于文章详情页） */
+.prose-lg {
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+
+.prose-lg h1 {
+  font-size: 2.25em;
+  margin-top: 0;
+  margin-bottom: 0.8888889em;
+  line-height: 1.1111111;
+}
+
+.prose-lg h2 {
+  font-size: 1.5em;
+  margin-top: 2em;
+  margin-bottom: 1em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.prose-lg p {
+  margin-top: 1.2em;
+  margin-bottom: 1.2em;
+}
+
+/* 代码块增强 */
+.prose pre {
+  margin: 1.5em 0;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* 图片优化 */
+.prose img {
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }

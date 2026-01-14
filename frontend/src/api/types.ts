@@ -1,25 +1,29 @@
-export type HotCommentReply = {
+export type PostCommentReply = {
   id: number
   user: string
   text: string
   likes: number
+  createdAt: number
+  toUser: string | null
 }
 
-export type HotComment = {
-  id?: number
+export type PostComment = {
+  id: number
   user: string
   text: string
-  likes?: number
-  replies?: HotCommentReply[]
+  likes: number
+  createdAt: number
+  hot: boolean
+  replies: PostCommentReply[]
 }
 
 export type Post = {
   id: number
   author: string
   title: string
-  time: string
+  createdAt: number | null
+  updatedAt: number | null
   content: string
-  hotComment: HotComment | null
   views: number
   likes: number
   comments: number
@@ -38,10 +42,28 @@ export type MenuItem = {
 export type AdminMe = {
   id: number
   username: string
+  avatarUrl: string | null
+  gender: string | null
+  age: number | null
+  email: string | null
+  phone: string | null
+  qq: string | null
+  wechat: string | null
+  github: string | null
+  gitee: string | null
+  visibility: {
+    gender: 'public' | 'private'
+    age: 'public' | 'private'
+    email: 'public' | 'private'
+    phone: 'public' | 'private'
+    qq: 'public' | 'private'
+    wechat: 'public' | 'private'
+    github: 'public' | 'private'
+    gitee: 'public' | 'private'
+  } | null
   createdAt: string
   updatedAt: string
   lastLoginAt: string | null
   lastLoginIp: string | null
   lastLoginLocation: string | null
 }
-

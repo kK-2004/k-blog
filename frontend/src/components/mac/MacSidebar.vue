@@ -5,7 +5,7 @@ import { useBackendSidebarConfig } from '@/composables/useBackendSidebarConfig'
 
 const props = defineProps<{
   isOpen: boolean
-  currentView: 'blog' | 'admin' | 'settings' | 'login'
+  currentView: 'blog' | 'admin' | 'settings' | 'login' | 'article'
   isAuthenticated: boolean
 }>()
 

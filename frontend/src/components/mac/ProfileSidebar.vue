@@ -13,6 +13,7 @@ const tabs = [
   { id: 'basic', name: '基本信息', icon: 'ph-identification-card' },
   { id: 'contact', name: '联系方式', icon: 'ph-address-book' },
   { id: 'social', name: '社交链接', icon: 'ph-link' },
+  { id: 'password', name: '修改密码', icon: 'ph-lock-key' },
 ]
 </script>
 

@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useUserProfile } from '@/composables/useUserProfile'
 import { useUserAvatar } from '@/composables/useUserAvatar'
 import { useMessage } from '@/composables/useMessage'
+import { updatePassword } from '@/api/admin'
 import type { Gender, FieldVisibility } from '@/types/user'
 
 const props = defineProps<{
@@ -39,6 +40,13 @@ const visibility = ref({
 
 const isEditing = ref(false)
 
+const passwordForm = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
+const isUpdatingPassword = ref(false)
+
 onMounted(async () => {
   await loadProfile()
   // 初始化表单数据
@@ -68,6 +76,37 @@ const startEdit = () => {
 const cancelEdit = () => {
   isEditing.value = false
   resetForm()
+}
+
+const handleUpdatePassword = async () => {
+  if (isUpdatingPassword.value) return
+  const oldPassword = passwordForm.value.oldPassword.trim()
+  const newPassword = passwordForm.value.newPassword.trim()
+  const confirmPassword = passwordForm.value.confirmPassword.trim()
+
+  if (!oldPassword || !newPassword) {
+    showError('请输入旧密码和新密码')
+    return
+  }
+  if (newPassword.length < 6) {
+    showError('新密码至少 6 位')
+    return
+  }
+  if (newPassword !== confirmPassword) {
+    showError('两次输入的新密码不一致')
+    return
+  }
+
+  isUpdatingPassword.value = true
+  try {
+    await updatePassword({ oldPassword, newPassword })
+    showSuccess('密码修改成功')
+    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  } catch (err) {
+    showError(err instanceof Error ? err.message : '密码修改失败')
+  } finally {
+    isUpdatingPassword.value = false
+  }
 }
 
 const handleSave = async () => {
@@ -143,6 +182,72 @@ const genderOptions = [
 
 <template>
   <div class="space-y-6">
+    <!-- 修改密码 -->
+    <div v-if="currentTab === 'password'" class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
+      <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+          <i class="ph ph-lock-key text-lg"></i>
+          修改密码
+        </h2>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <i class="ph ph-key text-lg"></i>
+            旧密码
+          </label>
+          <input
+            v-model="passwordForm.oldPassword"
+            type="password"
+            autocomplete="current-password"
+            class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a] text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="请输入旧密码"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <i class="ph ph-lock text-lg"></i>
+            新密码
+          </label>
+          <input
+            v-model="passwordForm.newPassword"
+            type="password"
+            autocomplete="new-password"
+            class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a] text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="请输入新密码（至少 6 位）"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <i class="ph ph-lock-simple text-lg"></i>
+            确认新密码
+          </label>
+          <input
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            autocomplete="new-password"
+            class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#2a2a2a] text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="请再次输入新密码"
+            @keyup.enter="handleUpdatePassword"
+          />
+        </div>
+
+        <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+          <button
+            class="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400/60 text-white text-sm font-medium rounded-lg transition-colors"
+            :disabled="isUpdatingPassword"
+            @click="handleUpdatePassword"
+          >
+            <i class="ph ph-check mr-1"></i>
+            {{ isUpdatingPassword ? '提交中...' : '确认修改' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 头像设置 -->
     <div v-if="currentTab === 'avatar'" class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
       <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6">

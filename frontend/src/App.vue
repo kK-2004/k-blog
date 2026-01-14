@@ -5,6 +5,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useHashRouter } from '@/composables/useHashRouter'
 import { listPosts } from '@/api/posts'
 import { logout as apiLogout, me as apiMe } from '@/api/admin'
+import { getPublicProfile } from '@/api/site'
 import type { AdminMe, Post } from '@/api/types'
 import MacNavBar from '@/components/mac/MacNavBar.vue'
 import MacSidebar from '@/components/mac/MacSidebar.vue'
@@ -12,19 +13,30 @@ import AdminView from '@/views/AdminView.vue'
 import BlogView from '@/views/BlogView.vue'
 import LoginView from '@/views/LoginView.vue'
 import SettingsView from '@/views/SettingsView.vue'
+import ArticleDetailView from '@/views/ArticleDetailView.vue'
 
 const { timeStr } = useClock()
 const { theme, toggleTheme, bgStyle } = useTheme()
-const { currentView, navigateTo } = useHashRouter()
+const { currentView, navigateTo, articleId } = useHashRouter()
 
 const isSidebarOpen = ref(false)
 const posts = ref<Post[]>([])
 const isAuthenticated = ref(false)
 const adminMe = ref<AdminMe | null>(null)
 const authReady = ref(false)
+const authorAvatarUrl = ref<string | null>(null)
 
 const refreshPosts = async () => {
   posts.value = await listPosts()
+}
+
+const loadPublicProfile = async () => {
+  try {
+    const profile = await getPublicProfile()
+    authorAvatarUrl.value = profile.avatarUrl
+  } catch {
+    authorAvatarUrl.value = null
+  }
 }
 
 const setPosts = (newPosts: Post[]) => {
@@ -62,9 +74,13 @@ const logout = async () => {
   }
 }
 
-// 点击头像：始终跳转到登录页（如果已登录则显示菜单）
+// 点击头像：已登录跳转到 admin，未登录跳转到 login
 const onAvatarClick = () => {
-  navigateTo('login')
+  if (isAuthenticated.value) {
+    navigateTo('admin')
+  } else {
+    navigateTo('login')
+  }
 }
 
 // 路由守卫：未登录不能访问 admin 和 settings
@@ -76,7 +92,7 @@ watch(currentView, (newView) => {
 })
 
 onMounted(async () => {
-  await Promise.all([refreshPosts(), refreshAuth()])
+  await Promise.all([refreshPosts(), refreshAuth(), loadPublicProfile()])
 })
 </script>
 
@@ -110,7 +126,13 @@ onMounted(async () => {
           isSidebarOpen ? 'translate-x-32' : 'translate-x-0'
         ]"
       >
-        <BlogView v-if="currentView === 'blog'" :posts="posts" />
+        <BlogView
+          v-if="currentView === 'blog'"
+          :posts="posts"
+          :isAuthenticated="isAuthenticated"
+          :adminMe="adminMe"
+          :authorAvatarUrl="authorAvatarUrl"
+        />
         <LoginView v-else-if="currentView === 'login'" @login-success="onLoginSuccess" />
         <AdminView
           v-else-if="currentView === 'admin'"
@@ -119,6 +141,14 @@ onMounted(async () => {
           @refresh="refreshPosts"
         />
         <SettingsView v-else-if="currentView === 'settings'" />
+        <ArticleDetailView
+          v-else-if="currentView === 'article'"
+          :postId="articleId!"
+          :isAuthenticated="isAuthenticated"
+          :adminMe="adminMe"
+          :authorAvatarUrl="authorAvatarUrl"
+          :isSidebarOpen="isSidebarOpen"
+        />
       </main>
     </div>
   </div>

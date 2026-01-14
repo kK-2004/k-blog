@@ -1,6 +1,14 @@
 import { apiFetch } from './http'
 import type { MenuItem } from './types'
 
+export type PublicProfile = {
+  avatarUrl: string | null
+}
+
+export async function getPublicProfile(): Promise<PublicProfile> {
+  return apiFetch<PublicProfile>('/api/site/profile')
+}
+
 export async function listMenuItems(): Promise<MenuItem[]> {
   return apiFetch<MenuItem[]>('/api/site/sidebar-menu-items')
 }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import AvatarCircle from './AvatarCircle.vue'
 import { useUserAvatar } from '@/composables/useUserAvatar'
 
-defineProps<{
+const props = defineProps<{
   timeStr: string
   theme: 'light' | 'dark'
   isAuthenticated: boolean
@@ -16,10 +16,15 @@ defineEmits<{
   (e: 'logout'): void
 }>()
 
-const { avatarUrl, hasCustomAvatar, loadAvatar } = useUserAvatar()
+const { avatarUrl, hasCustomAvatar, loadAvatar } = useUserAvatar(props.isAuthenticated)
 const imageError = ref(false)
 
 onMounted(() => {
+  loadAvatar()
+})
+
+// 监听登录状态变化，重新加载头像
+watch(() => props.isAuthenticated, () => {
   loadAvatar()
 })
 

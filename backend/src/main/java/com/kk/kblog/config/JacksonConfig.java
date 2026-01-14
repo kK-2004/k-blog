@@ -1,6 +1,7 @@
 package com.kk.kblog.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,7 +10,8 @@ public class JacksonConfig {
 
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper().findAndRegisterModules();
+        return new ObjectMapper()
+                .findAndRegisterModules()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 }
-

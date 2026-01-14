@@ -71,8 +71,8 @@ public class PostController {
         return postService.incrementLikes(id);
     }
 
-    @PostMapping("/{id}/comments")
-    public PostDto incrementComments(@PathVariable long id) {
+    @PostMapping("/{id}/comments/increment")
+    public PostDto incrementCommentsLegacy(@PathVariable long id) {
         return postService.incrementComments(id);
     }
 }

@@ -35,3 +35,51 @@ export async function logout(): Promise<void> {
 export async function me(): Promise<AdminMe> {
   return apiFetch<AdminMe>('/api/admin/me')
 }
+
+export type UpdateAdminProfileRequest = {
+  username?: string
+  avatarUrl?: string
+  avatarKey?: string
+  gender?: string | null
+  age?: number | null
+  email?: string | null
+  phone?: string | null
+  qq?: string | null
+  wechat?: string | null
+  github?: string | null
+  gitee?: string | null
+  visibility?: AdminMe['visibility']
+}
+
+export async function updateProfile(req: UpdateAdminProfileRequest): Promise<AdminMe> {
+  return apiFetch<AdminMe>('/api/admin/profile', { method: 'PUT', body: JSON.stringify(req) })
+}
+
+export type PresignAvatarRequest = {
+  filename: string
+  contentType: string
+}
+
+export type PresignAvatarResponse = {
+  uploadUrl: string
+  url: string
+  key: string
+  expireSeconds: number
+}
+
+export async function presignAvatar(req: PresignAvatarRequest): Promise<PresignAvatarResponse> {
+  return apiFetch<PresignAvatarResponse>('/api/admin/avatar/presign', { method: 'POST', body: JSON.stringify(req) })
+}
+
+export async function deleteAvatar(): Promise<void> {
+  return apiFetch<void>('/api/admin/avatar', { method: 'DELETE' })
+}
+
+export type UpdatePasswordRequest = {
+  oldPassword: string
+  newPassword: string
+}
+
+export async function updatePassword(req: UpdatePasswordRequest): Promise<void> {
+  return apiFetch<void>('/api/admin/password', { method: 'PUT', body: JSON.stringify(req) })
+}

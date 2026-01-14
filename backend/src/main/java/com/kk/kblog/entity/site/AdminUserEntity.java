@@ -34,6 +34,38 @@ public class AdminUserEntity {
     @Column(name = "last_login_location", length = 200)
     private String lastLoginLocation;
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
+    @Column(name = "avatar_key", length = 500)
+    private String avatarKey;
+
+    @Column(length = 20)
+    private String gender;
+
+    private Integer age;
+
+    @Column(length = 100)
+    private String email;
+
+    @Column(length = 50)
+    private String phone;
+
+    @Column(length = 50)
+    private String qq;
+
+    @Column(length = 50)
+    private String wechat;
+
+    @Column(length = 200)
+    private String github;
+
+    @Column(length = 200)
+    private String gitee;
+
+    @Column(name = "profile_visibility", columnDefinition = "TEXT")
+    private String profileVisibilityJson;
+
     protected AdminUserEntity() {
     }
 
@@ -100,5 +132,92 @@ public class AdminUserEntity {
     public void setLastLoginLocation(String lastLoginLocation) {
         this.lastLoginLocation = lastLoginLocation;
     }
-}
 
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public String getAvatarKey() {
+        return avatarKey;
+    }
+
+    public void setAvatarKey(String avatarKey) {
+        this.avatarKey = avatarKey;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getQq() {
+        return qq;
+    }
+
+    public void setQq(String qq) {
+        this.qq = qq;
+    }
+
+    public String getWechat() {
+        return wechat;
+    }
+
+    public void setWechat(String wechat) {
+        this.wechat = wechat;
+    }
+
+    public String getGithub() {
+        return github;
+    }
+
+    public void setGithub(String github) {
+        this.github = github;
+    }
+
+    public String getGitee() {
+        return gitee;
+    }
+
+    public void setGitee(String gitee) {
+        this.gitee = gitee;
+    }
+
+    public String getProfileVisibilityJson() {
+        return profileVisibilityJson;
+    }
+
+    public void setProfileVisibilityJson(String profileVisibilityJson) {
+        this.profileVisibilityJson = profileVisibilityJson;
+    }
+}

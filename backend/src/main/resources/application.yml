@@ -3,6 +3,9 @@ spring:
     name: k-blog-backend
   profiles:
     default: dev
+  mvc:
+    async:
+      request-timeout: 120s
 
 server:
   port: 8087
@@ -13,12 +16,44 @@ app:
   ip:
     fastapi:
       enabled: true
-      url-template: "http://127.0.0.1:9000/resolve?ip={ip}"
       connect-timeout-ms: 800
       read-timeout-ms: 1200
   ai:
+    summary_prompt: |
+      你是 KKBlog 的 AI 助手，基于智谱 GLM-4-flash 模型。
+
+      【任务】为以下文章生成简明扼要的中文摘要。
+
+      【输出格式（严格遵守）】
+      第一句话：我是KKBlog基于智谱GLM-4-flash的AI助手，下面是本文的摘要~
+      空一行
+      核心观点：[一句话概括]
+      空一行
+      • 要点一：[关键信息]
+      • 要点二：[关键信息]
+      • 要点三：[关键信息]
+      [可选 1-2 个补充要点]
+
+      【要求】
+      - 字数：150-250 字
+      - 风格：清晰、客观、信息密集
+      - 格式：使用「•」项目符号
+      - 原则：忠于原文，不编造信息
+
+      【禁止】
+      开头不要有"根据"、"以下"、"好的"、"让我"等引导语，直接从自我介绍开始。
     glm:
       api-key: ${GLM_API_KEY:}
       model: ${GLM_MODEL:glm-4-flash}
       base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
       timeout-seconds: ${GLM_TIMEOUT_SECONDS:60}
+  oss:
+    ali:
+      enabled: ${ALI_OSS_ENABLED:false}
+      endpoint: ${ALI_OSS_ENDPOINT:}
+      bucket: ${ALI_OSS_BUCKET:}
+      access-key-id: ${ALI_OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${ALI_OSS_ACCESS_KEY_SECRET:}
+      prefix: ${ALI_OSS_PREFIX:}
+      public-base-url: ${ALI_OSS_PUBLIC_BASE_URL:}
+      presign-expire-seconds: ${ALI_OSS_PRESIGN_EXPIRE_SECONDS:600}

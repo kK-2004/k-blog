@@ -5,6 +5,7 @@ import java.util.Arrays;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 @ControllerAdvice
 @Slf4j
@@ -49,7 +52,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
-        return new ResponseEntity<>(new ApiError("Validation failed"), HttpStatus.BAD_REQUEST);
+        try {
+            var binding = ex.getBindingResult();
+            var errors = binding.getFieldErrors().stream()
+                    .map(this::formatFieldError)
+                    .toList();
+            var msg = errors.isEmpty() ? "Validation failed" : "Validation failed: " + String.join("; ", errors);
+            log.warn("Validation failed: {}", msg);
+            return new ResponseEntity<>(new ApiError(msg), HttpStatus.BAD_REQUEST);
+        } catch (Exception ignored) {
+            return new ResponseEntity<>(new ApiError("Validation failed"), HttpStatus.BAD_REQUEST);
+        }
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -65,6 +78,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiError> handleMaxUpload(MaxUploadSizeExceededException ex) {
         return new ResponseEntity<>(new ApiError("上传文件过大，请压缩或分批上传"), HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public ResponseEntity<String> handleAsyncTimeout(AsyncRequestTimeoutException ex) {
+        // Streaming endpoints may have already committed headers as text/plain; return text to avoid converter errors.
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+                .contentType(MediaType.TEXT_PLAIN)
+                .body("Request timeout");
     }
 
     @ExceptionHandler(Exception.class)
@@ -110,5 +131,14 @@ public class GlobalExceptionHandler {
                 String.valueOf(requestId),
                 String.valueOf(hostId),
                 String.valueOf(errorMessage));
+    }
+
+    private String formatFieldError(FieldError err) {
+        var field = err.getField();
+        var message = err.getDefaultMessage();
+        if (message == null || message.isBlank()) {
+            message = "invalid";
+        }
+        return field + " " + message;
     }
 }

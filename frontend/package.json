@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
-    "@phosphor-icons/web": "^2.1.1",
+    "@phosphor-icons/web": "^2.1.2",
     "element-plus": "^2.13.1",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.1",

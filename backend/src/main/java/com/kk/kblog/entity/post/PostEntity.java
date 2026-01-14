@@ -1,14 +1,14 @@
 package com.kk.kblog.entity.post;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "posts")
@@ -18,14 +18,19 @@ public class PostEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100)
-    private String author;
+    @Column(name = "author", nullable = false, columnDefinition = "bigint")
+    private Long authorId;
 
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(name = "time_text", nullable = false, length = 50)
-    private String time;
+    @CreationTimestamp
+    @Column(name = "created_at", columnDefinition = "datetime(3) not null default current_timestamp(3)", updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", columnDefinition = "datetime(3) not null default current_timestamp(3) on update current_timestamp(3)")
+    private Instant updatedAt;
 
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
@@ -42,16 +47,12 @@ public class PostEntity {
     @Column(nullable = false)
     private boolean pinned;
 
-    @OneToOne(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private HotCommentEntity hotComment;
-
     protected PostEntity() {
     }
 
-    public PostEntity(String author, String title, String time, String content, int views, int likes, int comments, boolean pinned) {
-        this.author = author;
+    public PostEntity(Long authorId, String title, String content, int views, int likes, int comments, boolean pinned) {
+        this.authorId = authorId;
         this.title = title;
-        this.time = time;
         this.content = content;
         this.views = views;
         this.likes = likes;
@@ -63,12 +64,12 @@ public class PostEntity {
         return id;
     }
 
-    public String getAuthor() {
-        return author;
+    public Long getAuthorId() {
+        return authorId;
     }
 
-    public void setAuthor(String author) {
-        this.author = author;
+    public void setAuthorId(Long authorId) {
+        this.authorId = authorId;
     }
 
     public String getTitle() {
@@ -79,12 +80,12 @@ public class PostEntity {
         this.title = title;
     }
 
-    public String getTime() {
-        return time;
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 
-    public void setTime(String time) {
-        this.time = time;
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public String getContent() {
@@ -125,16 +126,5 @@ public class PostEntity {
 
     public void setPinned(boolean pinned) {
         this.pinned = pinned;
-    }
-
-    public HotCommentEntity getHotComment() {
-        return hotComment;
-    }
-
-    public void setHotComment(HotCommentEntity hotComment) {
-        if (hotComment != null) {
-            hotComment.setPost(this);
-        }
-        this.hotComment = hotComment;
     }
 }

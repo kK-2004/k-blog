@@ -19,7 +19,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
@@ -35,7 +34,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     private static final long BUCKET_CAPACITY = 10;
     private static final long BUCKET_REFILL_RATE_PER_SEC = 1;
 
-    private static final int BLACKLIST_THRESHOLD_PER_MINUTE = 30;
+    private static final int BLACKLIST_THRESHOLD_PER_MINUTE = 100;
     private static final long WINDOW_MS = 60_000L;
 
     private final ConcurrentMap<String, RateState> stateByKey = new ConcurrentHashMap<>();

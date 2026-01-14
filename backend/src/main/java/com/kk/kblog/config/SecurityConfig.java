@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -26,6 +27,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/login", "/api/admin/logout").permitAll()
                         .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/posts").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/posts/*").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/posts/*").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/posts/*").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(ex -> ex
