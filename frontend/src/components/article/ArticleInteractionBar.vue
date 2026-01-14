@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { createPostComment, createPostCommentReply } from '@/api/comments'
 
 interface ReplyingTo {
@@ -14,6 +14,7 @@ const props = defineProps<{
   postId: number
   isAuthenticated: boolean
   adminMe: { username: string; avatarUrl: string | null } | null
+  isSidebarOpen: boolean
 }>()
 
 const emit = defineEmits<{
@@ -23,9 +24,21 @@ const emit = defineEmits<{
 }>()
 
 // 输入框状态
+const draftUser = ref('')
 const inputText = ref('')
 const replyingTo = ref<ReplyingTo | null>(null)
 const isSubmitting = ref(false)
+
+// 监听登录状态变化，自动填充用户名
+watch(
+  () => props.adminMe,
+  (me) => {
+    if (me && props.isAuthenticated) {
+      draftUser.value = me.username
+    }
+  },
+  { immediate: true }
+)
 
 // 监听外部传入的回复状态
 const setReplyingTo = (value: ReplyingTo | null) => {
@@ -46,28 +59,22 @@ const handleCancelReply = () => {
 
 // 提交评论
 const handleSubmit = async () => {
-  if (!props.isAuthenticated) {
-    alert('请先登录')
-    return
-  }
-
   if (!inputText.value.trim()) {
     alert('请输入评论内容')
     return
   }
 
-  if (!props.adminMe) {
-    alert('请先登录')
-    return
-  }
+  const user = draftUser.value.trim() || 'Guest'
+  const text = inputText.value.trim()
+  inputText.value = ''
 
   isSubmitting.value = true
   try {
     if (replyingTo.value) {
       // 提交回复
       const created = await createPostCommentReply(props.postId, replyingTo.value.rootId, {
-        user: props.adminMe.username,
-        text: inputText.value.trim(),
+        user,
+        text,
         toUser: replyingTo.value.toUser,
       })
 
@@ -80,10 +87,7 @@ const handleSubmit = async () => {
       })
     } else {
       // 提交评论
-      const created = await createPostComment(props.postId, {
-        user: props.adminMe.username,
-        text: inputText.value.trim(),
-      })
+      const created = await createPostComment(props.postId, { user, text })
 
       emit('comment-submitted', {
         id: created.id,
@@ -93,7 +97,6 @@ const handleSubmit = async () => {
     }
 
     // 重置输入框
-    inputText.value = ''
     replyingTo.value = null
   } catch (error) {
     console.error('提交评论失败:', error)
@@ -122,57 +125,61 @@ defineExpose({
 </script>
 
 <template>
-  <div class="fixed bottom-0 left-0 right-0 z-[100]">
-    <!-- 渐变遮罩 -->
-    <div class="absolute bottom-full left-0 right-0 h-24 bg-gradient-to-t from-[#f5f5f7] via-[#f5f5f7]/80 to-transparent dark:from-[#121212] dark:via-[#121212]/80 pointer-events-none"></div>
+  <div class="fixed bottom-0 right-0 transition-all duration-300 z-[100]" :class="isSidebarOpen ? 'left-64' : 'left-0'">
+<!--    &lt;!&ndash; 渐变遮罩 &ndash;&gt;-->
+<!--    <div class="absolute bottom-full left-0 right-0 h-14 bg-gradient-to-t from-[#f5f5f780] via-[#f5f5f780]/80 to-transparent dark:from-[#12121280] dark:via-[#12121280]/80 pointer-events-none"></div>-->
 
     <!-- 底部栏 -->
     <div class="bg-[#f5f5f7]/90 dark:bg-[#121212]/90 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-800/50 shadow-2xl">
       <div class="max-w-4xl mx-auto px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
 
-        <!-- 回复提示标签（回复时显示） -->
-        <div
-          v-if="replyingTo"
-          class="flex items-center justify-between mb-2 px-2"
-        >
-          <div class="flex items-center gap-2 bg-blue-500 text-white text-xs px-3 py-1.5 rounded-full">
-            <i class="ph-bold ph-arrow-return-left"></i>
-            <span>回复 @{{ replyingTo.toUser }}</span>
-          </div>
-          <button
-            @click="handleCancelReply"
-            class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-          >
-            取消回复
-          </button>
-        </div>
-
         <!-- 主操作区 -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-end gap-3">
 
           <!-- 输入框 -->
-          <div class="flex-1 relative">
-            <textarea
-              v-model="inputText"
-              data-comment-input
-              :placeholder="replyingTo ? `回复 @${replyingTo.toUser}...` : '写下你的想法...'"
-              class="w-full px-4 py-2.5 pr-24 bg-white dark:bg-[#1e1e1e] rounded-full text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              rows="1"
-              @keydown.ctrl.enter="handleSubmit"
-              @keydown.meta.enter="handleSubmit"
-              style="min-height: 42px; max-height: 120px;"
-            ></textarea>
-
-            <!-- 发送按钮（绝对定位在输入框右侧） -->
-            <button
-              @click="handleSubmit"
-              :disabled="isSubmitting || !inputText.trim()"
-              class="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-white/10 text-white rounded-full text-xs font-medium transition-colors disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              <i v-if="isSubmitting" class="ph ph-spinner animate-spin"></i>
-              <span v-else>发送</span>
-            </button>
+          <div class="flex-1">
+            <div class="bg-gray-100 dark:bg-[#2c2c2e] p-1 rounded-[20px] border border-transparent focus-within:border-blue-500/30 transition-all flex flex-col shadow-inner">
+              <!-- 回复提示标签（回复时显示） -->
+              <div
+                v-if="replyingTo"
+                class="px-3 py-1 text-[11px] text-blue-500 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 rounded-t-[16px] mb-1"
+              >
+                <span>
+                  回复<span v-if="replyingTo.toUser" class="font-bold"> @{{ replyingTo.toUser }}</span
+                  ><span v-else class="font-bold"> #{{ replyingTo.rootId }}</span
+                  >...
+                </span>
+                <button class="hover:text-red-500" @click="handleCancelReply">
+                  <i class="ph ph-x"></i>
+                </button>
+              </div>
+              <input
+                v-model="draftUser"
+                placeholder="Nickname..."
+                class="bg-transparent text-[10px] text-gray-500 dark:text-gray-400 px-3 py-1 outline-none w-full border-b border-gray-200 dark:border-white/5 mb-1 placeholder-gray-400/70"
+              />
+              <textarea
+                v-model="inputText"
+                data-comment-input
+                :placeholder="replyingTo ? (replyingTo.toUser ? `回复 @${replyingTo.toUser}...` : `回复 #${replyingTo.rootId}...`) : '发表评论...'"
+                rows="1"
+                class="bg-transparent text-sm px-3 py-1 outline-none w-full resize-none text-gray-800 dark:text-gray-100 placeholder-gray-400"
+                style="min-height: 24px"
+                @keydown.ctrl.enter="handleSubmit"
+                @keydown.meta.enter="handleSubmit"
+              ></textarea>
+            </div>
           </div>
+
+          <!-- 发送按钮 -->
+          <button
+            class="w-8 h-8 rounded-full bg-[#007AFF] hover:bg-[#0062cc] disabled:bg-gray-300 dark:disabled:bg-gray-600 flex items-center justify-center text-white transition-all shadow-md active:scale-95 mb-0.5 shrink-0"
+            :disabled="isSubmitting || !inputText.trim()"
+            @click="handleSubmit"
+          >
+            <i v-if="isSubmitting" class="ph ph-spinner animate-spin"></i>
+            <i v-else class="ph ph-paper-plane-right font-bold"></i>
+          </button>
 
           <!-- 点赞按钮 -->
           <button

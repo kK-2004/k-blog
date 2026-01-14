@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getPost, incrementLikes, incrementViews } from '@/api/posts'
 import { useReadStats } from '@/composables/useReadStats'
 import { useScrollProgress } from '@/composables/useScrollProgress'
@@ -92,7 +92,7 @@ const scrollToComment = () => {
 
     // 计算元素相对于滚动容器的位置
     const scrollTop = (scrollContainer as HTMLElement).scrollTop
-    const elementPosition = scrollTop + elementRect.top - containerRect.top - offset
+    const elementPosition = scrollTop + elementRect.top - containerRect.top - offset;
 
     (scrollContainer as HTMLElement).scrollTo({
       top: elementPosition,
@@ -126,12 +126,22 @@ const handleCommentSubmitted = (data: {
 
 // 组件挂载时获取数据
 onMounted(() => {
+  const prevHtmlOverflow = document.documentElement.style.overflow
+  const prevBodyOverflow = document.body.style.overflow
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
+
+  onBeforeUnmount(() => {
+    document.documentElement.style.overflow = prevHtmlOverflow
+    document.body.style.overflow = prevBodyOverflow
+  })
+
   fetchPost()
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f5f5f7] dark:bg-[#121212] transition-colors duration-300 font-sans selection:bg-blue-100 selection:text-blue-900">
+  <div class="h-screen h-[100dvh] overflow-hidden bg-[#f5f5f700] dark:bg-[#12121200] transition-colors duration-300 font-sans selection:bg-blue-100 selection:text-blue-900">
 
     <div v-if="loading" class="fixed inset-0 pt-32 flex items-start justify-center">
     </div>
@@ -147,17 +157,17 @@ onMounted(() => {
       />
 
       <!-- 固定视口容器：左侧滚动，右侧固定 -->
-      <main class="fixed inset-0 pt-2 overflow-hidden">
-        <div class="h-full max-w-7xl mx-auto px-4 sm:px-6">
-          <div class="flex h-full gap-8">
+      <main class="fixed inset-0 pt-2 overflow-hidden z-10">
+        <div class="h-full w-full px-4 sm:px-6">
+          <div class="flex h-full gap-6 2xl:gap-8">
 
             <!-- 左侧：正文滚动区域 -->
             <article class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
-              <div class="max-w-4xl mx-auto py-6 pb-64">
+              <div class="max-w-[110rem] mx-auto py-6 pb-64">
 
                 <!-- 文章卡片 -->
                 <div class="rounded-xl border border-gray-200/60 dark:border-gray-800/60 overflow-hidden">
-                  <div class="p-8 md:p-12 lg:p-16">
+                  <div class="p-8 md:p-12 lg:p-14">
 
                     <ArticleMeta
                         :author="post.author"
@@ -201,8 +211,8 @@ onMounted(() => {
             </article>
 
             <!-- 右侧：目录固定 -->
-            <aside class="hidden xl:block w-64 shrink-0 py-6">
-              <div class="sticky top-0">
+            <aside class="hidden xl:block 2xl:w-48 shrink-0 py-6">
+              <div class="sticky top-0 pt-8 md:pt-10 lg:pt-12">
                 <ArticleTOC
                     :headings="headings"
                     :activeId="activeHeadingId"
@@ -215,19 +225,22 @@ onMounted(() => {
       </main>
 
       <!-- 底部交互栏 -->
-      <ArticleInteractionBar
-          ref="interactionBarRef"
-          :postId="post.id"
-          :likes="localLikes"
-          :hasLiked="hasLiked"
-          :hasComments="post.comments > 0"
-          :isAuthenticated="isAuthenticated"
-          :adminMe="adminMe"
-          @like="handleLike"
-          @comment="scrollToComment"
-          @share="() => {}"
-          @comment-submitted="handleCommentSubmitted"
-      />
+      <Teleport to="body">
+        <ArticleInteractionBar
+            ref="interactionBarRef"
+            :postId="post.id"
+            :likes="localLikes"
+            :hasLiked="hasLiked"
+            :hasComments="post.comments > 0"
+            :isAuthenticated="isAuthenticated"
+            :adminMe="adminMe"
+            :isSidebarOpen="isSidebarOpen"
+            @like="handleLike"
+            @comment="scrollToComment"
+            @share="() => {}"
+            @comment-submitted="handleCommentSubmitted"
+        />
+      </Teleport>
 
     </template>
   </div>
