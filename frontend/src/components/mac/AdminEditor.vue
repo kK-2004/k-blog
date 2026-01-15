@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
+import ImageLightbox from './ImageLightbox.vue'
 
 const props = defineProps<{
   initialContent?: string
@@ -16,6 +17,11 @@ const content = ref(props.initialContent || '')
 const previewMode = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const codeMenuOpen = ref(false)
+const imageMenuOpen = ref(false)
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const uploadingImage = ref(false)
+const selectedImageSize = ref<'original' | 'small' | 'medium' | 'large' | 'half'>('original')
+const lightboxImageUrl = ref('')
 
 watch(
   () => props.initialContent,
@@ -42,7 +48,127 @@ const insertText = (before: string, after = '') => {
 }
 
 const insertCode = (lang: string) => insertText(`\n\`\`\`${lang}\n`, '\n```\n')
-const insertImage = () => insertText('![Image Description](', ')')
+
+const selectImageSize = (size: 'original' | 'small' | 'medium' | 'large' | 'half') => {
+  selectedImageSize.value = size
+  imageMenuOpen.value = false
+  imageInputRef.value?.click()
+}
+
+const handleImageSelect = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  // 重置 input 以便可以重复选择同一文件
+  input.value = ''
+
+  if (!file.type.startsWith('image/')) {
+    alert('请选择图片文件')
+    return
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    alert('图片大小不能超过 10MB')
+    return
+  }
+
+  uploadingImage.value = true
+
+  try {
+    // 1. 获取预签名 URL
+    const presignRes = await fetch('/api/admin/images/presign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type
+      })
+    })
+
+    if (!presignRes.ok) {
+      throw new Error('获取上传地址失败')
+    }
+
+    const presignData = await presignRes.json()
+
+    // 2. 直接上传到 OSS（需要携带签名时包含的 header）
+    const uploadRes = await fetch(presignData.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type,
+        'x-oss-object-acl': 'public-read'
+      }
+    })
+
+    if (!uploadRes.ok) {
+      throw new Error('上传失败')
+    }
+
+    // 3. 根据选择的尺寸插入图片
+    const textarea = textareaRef.value
+    if (textarea) {
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const imageUrl = presignData.url
+
+      let imageMarkdown = ''
+      switch (selectedImageSize.value) {
+        case 'original':
+          imageMarkdown = `\n![${file.name}](${imageUrl})\n`
+          break
+        case 'small':
+          imageMarkdown = `\n<img src="${imageUrl}" style="width: 200px;" alt="${file.name}">\n`
+          break
+        case 'medium':
+          imageMarkdown = `\n<img src="${imageUrl}" style="width: 400px;" alt="${file.name}">\n`
+          break
+        case 'large':
+          imageMarkdown = `\n<img src="${imageUrl}" style="width: 600px;" alt="${file.name}">\n`
+          break
+        case 'half':
+          imageMarkdown = `\n<img src="${imageUrl}" style="width: 50%;" alt="${file.name}">\n`
+          break
+      }
+
+      content.value = content.value.substring(0, start) + imageMarkdown + content.value.substring(end)
+
+      nextTick(() => {
+        textarea.focus()
+        const newCursorPos = start + imageMarkdown.length
+        textarea.setSelectionRange(newCursorPos, newCursorPos)
+      })
+    }
+  } catch (err) {
+    console.error('图片上传失败:', err)
+    alert('图片上传失败，请重试')
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
+// 图片尺寸选项
+const imageSizeOptions = [
+  { key: 'original', label: '原图', desc: '原始大小' },
+  { key: 'small', label: '小图', desc: '200px' },
+  { key: 'medium', label: '中图', desc: '400px' },
+  { key: 'large', label: '大图', desc: '600px' },
+  { key: 'half', label: '50%', desc: '相对宽度' },
+]
+
+// 预览区图片点击处理
+const handlePreviewImageClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (target.tagName === 'IMG') {
+    const img = target as HTMLImageElement
+    lightboxImageUrl.value = img.src
+  }
+}
+
+const closeLightbox = () => {
+  lightboxImageUrl.value = ''
+}
 </script>
 
 <template>
@@ -117,13 +243,43 @@ const insertImage = () => insertText('![Image Description](', ')')
           </div>
         </div>
 
-        <button
-          class="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
-          title="Image"
-          @click="insertImage"
+        <!-- 图片按钮 + 尺寸选择菜单 -->
+        <div class="relative group/image-menu" @mouseenter="imageMenuOpen = true" @mouseleave="imageMenuOpen = false">
+          <button
+            class="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+            title="Image"
+            :disabled="uploadingImage"
+          >
+            <i class="ph ph-image" :class="{ 'animate-pulse': uploadingImage }"></i>
+            <i class="ph ph-caret-down text-[10px]"></i>
+          </button>
+          <!-- 不可见的桥接层 -->
+          <div class="absolute top-full left-0 h-1 w-full -mt-1" v-show="imageMenuOpen"></div>
+          <!-- 尺寸选择菜单 -->
+          <div
+            class="absolute top-full right-0 w-36 bg-white dark:bg-[#333] shadow-xl rounded-lg border border-gray-100 dark:border-black py-1 z-50"
+            :class="imageMenuOpen ? 'block' : 'hidden'"
+            @mouseenter="imageMenuOpen = true"
+            @mouseleave="imageMenuOpen = false"
+          >
+            <button
+              v-for="option in imageSizeOptions"
+              :key="option.key"
+              class="block w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm dark:text-gray-300 flex justify-between items-center"
+              @click="selectImageSize(option.key as any)"
+            >
+              <span>{{ option.label }}</span>
+              <span class="text-xs text-gray-400">{{ option.desc }}</span>
+            </button>
+          </div>
+        </div>
+        <input
+          ref="imageInputRef"
+          type="file"
+          accept="image/*"
+          class="hidden"
+          @change="handleImageSelect"
         >
-          <i class="ph ph-image"></i>
-        </button>
       </div>
 
       <div class="flex items-center gap-3">
@@ -149,10 +305,16 @@ const insertImage = () => insertText('![Image Description](', ')')
           placeholder="# Write something amazing..."
         ></textarea>
         <div v-show="previewMode" class="flex-1 h-full overflow-y-auto p-8 bg-gray-50 dark:bg-[#252525] mac-scrollbar">
-          <div class="prose dark:prose-invert max-w-2xl mx-auto" v-html="renderMarkdown(content)"></div>
+          <div
+            class="prose dark:prose-invert max-w-2xl mx-auto"
+            v-html="renderMarkdown(content)"
+            @click="handlePreviewImageClick"
+          ></div>
         </div>
       </div>
     </div>
+
+    <!-- 图片预览 Lightbox -->
+    <ImageLightbox :image-url="lightboxImageUrl" :is-open="!!lightboxImageUrl" @close="closeLightbox" />
   </div>
 </template>
-

@@ -2,6 +2,7 @@
 import { computed, watch, nextTick, ref } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import type { Heading } from './ArticleTOC.vue'
+import ImageLightbox from '../mac/ImageLightbox.vue'
 
 const props = defineProps<{
   content: string
@@ -13,6 +14,21 @@ const emit = defineEmits<{
 
 const renderedContent = computed(() => renderMarkdown(props.content))
 const contentRef = ref<HTMLElement | null>(null)
+
+// 图片预览
+const lightboxImageUrl = ref('')
+
+const handleContentImageClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (target.tagName === 'IMG') {
+    const img = target as HTMLImageElement
+    lightboxImageUrl.value = img.src
+  }
+}
+
+const closeLightbox = () => {
+  lightboxImageUrl.value = ''
+}
 
 // 从渲染后的 HTML 中提取标题
 const extractHeadings = () => {
@@ -65,6 +81,9 @@ watch(() => props.content, () => {
     prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:bg-blue-50 dark:prose-blockquote:bg-blue-500/10 prose-blockquote:py-2 prose-blockquote:px-4
     prose-ul:list-disc prose-ol:list-decimal
   ">
-    <div v-html="renderedContent" />
+    <div v-html="renderedContent" @click="handleContentImageClick" />
   </article>
+
+  <!-- 图片预览 Lightbox -->
+  <ImageLightbox :image-url="lightboxImageUrl" :is-open="!!lightboxImageUrl" @close="closeLightbox" />
 </template>

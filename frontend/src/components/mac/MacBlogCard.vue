@@ -6,10 +6,26 @@ import { useReadStats } from '@/composables/useReadStats'
 import { useHashRouter } from '@/composables/useHashRouter'
 import { useMessage } from '@/composables/useMessage'
 import AvatarCircle from './AvatarCircle.vue'
+import ImageLightbox from './ImageLightbox.vue'
 import { incrementLikes, incrementViews } from '@/api/posts'
 import { createPostComment, createPostCommentReply, likePostComment, listPostComments } from '@/api/comments'
 
 const { success } = useMessage()
+
+// 图片预览
+const lightboxImageUrl = ref('')
+
+const handleContentImageClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (target.tagName === 'IMG') {
+    const img = target as HTMLImageElement
+    lightboxImageUrl.value = img.src
+  }
+}
+
+const closeLightbox = () => {
+  lightboxImageUrl.value = ''
+}
 
 type ReplyItem = {
   id: number
@@ -1020,6 +1036,7 @@ const closeCollapseHint = () => {
               class="prose dark:prose-invert text-[15px] leading-relaxed font-sans max-w-none transition-all duration-300"
               :class="[!isVisuallyExpanded && showExpandBtn ? 'mac-collapsed-preview' : 'mac-expanded-view']"
               v-html="renderMarkdown(post.content)"
+              @click="handleContentImageClick"
           ></div>
 
           <div
@@ -1342,6 +1359,9 @@ const closeCollapseHint = () => {
         </div>
       </Transition>
     </Teleport>
+
+    <!-- 图片预览 Lightbox -->
+    <ImageLightbox :image-url="lightboxImageUrl" :is-open="!!lightboxImageUrl" @close="closeLightbox" />
   </div>
 </template>
 

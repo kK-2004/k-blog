@@ -110,7 +110,14 @@ code, pre {
 .prose img {
   max-width: 100%;
   border-radius: 8px;
-  margin: 1em 0;
+  margin: 1em auto;
+  display: block;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.prose img:hover {
+  opacity: 0.9;
 }
 
 /* ========================================
@@ -184,4 +191,7 @@ html {
 .prose img {
   border-radius: 0.75rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: block;
+  margin: 1.5em auto;
+  cursor: pointer;
 }

@@ -1,12 +1,12 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/kblog?useSSL=true&serverTimezone=UTC&characterEncoding=utf8
+    url: jdbc:mysql://mysql:3306/kblog?useSSL=true&serverTimezone=UTC&characterEncoding=utf8
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: ${DDL_AUTO:update}
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
@@ -16,9 +16,12 @@ spring:
 
 logging:
   file:
-    path: /logs
+    path: /app/logs
   level:
+    root: INFO
+    com.kk.kblog: INFO
     org.hibernate.SQL: warn
+    org.hibernate.type.descriptor.sql.BasicBinder: warn
 
 management:
   endpoints:
@@ -34,11 +37,30 @@ management:
       enabled: true
 
 app:
+  cors:
+    allowed-origins: "https://blog.ksite.xin"
   admin:
     username: ${ADMIN_USERNAME:kK}
     password: ${ADMIN_PASSWORD}
   ip:
     fastapi:
       enabled: true
+      url-template: ${IP_FASTAPI_URL_TEMPLATE:http://ip_resolver:9000/resolve?ip={ip}}
       connect-timeout-ms: ${IP_FASTAPI_CONNECT_TIMEOUT_MS:800}
       read-timeout-ms: ${IP_FASTAPI_READ_TIMEOUT_MS:1200}
+  oss:
+    ali:
+      enabled: ${ALI_OSS_ENABLED:true}
+      endpoint: ${ALI_OSS_ENDPOINT:}
+      bucket: ${ALI_OSS_BUCKET:}
+      access-key-id: ${ALI_OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${ALI_OSS_ACCESS_KEY_SECRET:}
+      prefix: ${ALI_OSS_PREFIX:kblog/}
+      public-base-url: ${ALI_OSS_PUBLIC_BASE_URL:}
+      presign-expire-seconds: ${ALI_OSS_PRESIGN_EXPIRE_SECONDS:600}
+  ai:
+    glm:
+      api-key: ${GLM_API_KEY:}
+      model: ${GLM_MODEL:glm-4-flash}
+      base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
+      timeout-seconds: ${GLM_TIMEOUT_SECONDS:60}

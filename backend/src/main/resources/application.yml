@@ -50,7 +50,7 @@ app:
       timeout-seconds: ${GLM_TIMEOUT_SECONDS:60}
   oss:
     ali:
-      enabled: ${ALI_OSS_ENABLED:false}
+      enabled: ${ALI_OSS_ENABLED:true}
       endpoint: ${ALI_OSS_ENDPOINT:}
       bucket: ${ALI_OSS_BUCKET:}
       access-key-id: ${ALI_OSS_ACCESS_KEY_ID:}
