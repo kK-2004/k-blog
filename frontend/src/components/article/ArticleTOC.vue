@@ -22,7 +22,7 @@ const scrollToHeading = (id: string) => {
 
   if (el && scrollContainer) {
     (scrollContainer as HTMLElement).scrollTo({
-      top: Math.max(0, el.offsetTop - 70),
+      top: Math.max(0, el.offsetTop - 90),
       behavior: 'smooth'
     })
 

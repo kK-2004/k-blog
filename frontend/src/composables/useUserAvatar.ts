@@ -13,7 +13,7 @@ const avatarUrl = ref<string | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
-export function useUserAvatar(isAuthenticated: boolean) {
+export function useUserAvatar(isAuthenticated = false) {
   // 从服务器加载头像信息
   const loadAvatar = async () => {
     try {

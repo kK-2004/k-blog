@@ -54,7 +54,7 @@ const updatePosition = () => {
   guidePosition.value = {
     top: props.step === 1
       ? targetRect.bottom + verticalGap
-      : targetRect.top - guideHeight - verticalGap - 80,
+      : targetRect.top - guideHeight - verticalGap - 60,
     left: targetRect.left + targetRect.width / 2 - guideWidth / 2
   }
 
@@ -91,7 +91,10 @@ const handleClose = () => {
 }
 
 onMounted(() => {
-  updatePosition()
+  // 延迟更新位置，等待目标元素渲染和动画完成
+  setTimeout(() => {
+    updatePosition()
+  }, 150)
   window.addEventListener('resize', updatePosition)
 })
 

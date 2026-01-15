@@ -1,16 +1,81 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useUserProfile } from '@/composables/useUserProfile'
+import { usePublicProfile } from '@/composables/usePublicProfile'
 import { useUserAvatar } from '@/composables/useUserAvatar'
+import { listVisibleBlogQuickActions } from '@/api/site'
+import type { QuickAction } from '@/api/types'
 
-const { profile, loadProfile, isFieldVisible, isFieldFilled } = useUserProfile()
-const { avatarUrl, hasCustomAvatar } = useUserAvatar()
+const props = defineProps<{
+  showFullFeatures?: boolean
+  isAuthenticated?: boolean
+}>()
+
+// 根据登录状态选择使用哪个 composable
+const userProfile = useUserProfile()
+const publicProfile = usePublicProfile()
+
+// 动态选择 profile 数据源
+const profile = computed(() => {
+  return props.isAuthenticated ? userProfile.profile.value : publicProfile.profile.value
+})
+
+// 动态选择加载方法
+const loadProfile = async () => {
+  if (props.isAuthenticated) {
+    return await userProfile.loadProfile()
+  } else {
+    return await publicProfile.loadProfile()
+  }
+}
+
+// 动态选择可见性判断方法（公开资料模式下所有字段都可见）
+const isFieldVisible = (field: string) => {
+  if (props.isAuthenticated) {
+    return userProfile.isFieldVisible(field as any)
+  }
+  return true
+}
+
+// 动态选择填充判断方法
+const isFieldFilled = (field: string) => {
+  if (props.isAuthenticated) {
+    return userProfile.isFieldFilled(field as any)
+  }
+  return publicProfile.isFieldFilled(field as any)
+}
+
+// 登录用户使用 useUserAvatar，未登录用户从 publicProfile 获取头像
+const { avatarUrl: userAvatarUrl, hasCustomAvatar } = useUserAvatar()
+const avatarUrl = computed(() => {
+  if (props.isAuthenticated) {
+    return userAvatarUrl.value
+  }
+  return publicProfile.profile.value?.avatarUrl || null
+})
 
 const isHovering = ref(false)
+const blogQuickActions = ref<QuickAction[]>([])
 
 onMounted(async () => {
   await loadProfile()
+  if (props.showFullFeatures === false) {
+    try {
+      blogQuickActions.value = await listVisibleBlogQuickActions()
+    } catch {
+      blogQuickActions.value = []
+    }
+  }
 })
+
+const openBlogQuickAction = (item: QuickAction) => {
+  if (item.targetType === 'internal') {
+    const hash = item.target.startsWith('#') ? item.target : `#${item.target}`
+    window.location.hash = hash
+    return
+  }
+  window.open(item.target, '_blank', 'noopener,noreferrer')
+}
 
 const getGenderText = (gender: string | null) => {
   const map: Record<string, string> = {
@@ -34,151 +99,150 @@ const getGenderIcon = (gender: string | null) => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- 用户名片 -->
-    <div class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
-      <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-6">
-        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-          <i class="ph ph-user text-lg"></i>
-          个人名片
-        </h2>
-      </div>
-
-      <div class="p-6">
-        <div class="flex items-start gap-6">
-          <!-- 头像 -->
-          <div class="relative group" @mouseenter="isHovering = true" @mouseleave="isHovering = false">
-            <div class="w-24 h-24 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 border-4 border-white dark:border-gray-600 shadow-lg">
-              <img
+  <div class="space-y-4">
+    <!-- 用户卡片 - 简洁设计 -->
+    <div class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-white/5 overflow-hidden">
+      <!-- 头像和基本信息 -->
+      <div class="p-6 text-center">
+        <!-- 头像 -->
+        <div
+            class="relative inline-block mb-4"
+            @mouseenter="showFullFeatures ? isHovering = true : null"
+            @mouseleave="showFullFeatures ? isHovering = false : null"
+        >
+          <div class="w-20 h-20 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 shadow-lg">
+            <img
                 v-if="avatarUrl"
                 :src="avatarUrl"
                 alt="Avatar"
                 class="w-full h-full object-cover"
-              />
-              <div v-else class="w-full h-full flex items-center justify-center text-4xl font-bold text-gray-400">
-                {{ profile.username.charAt(0).toUpperCase() }}
-              </div>
-            </div>
-            <div
-              v-if="isHovering && hasCustomAvatar"
-              class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full cursor-pointer"
-            >
-              <i class="ph ph-camera text-white text-2xl"></i>
+                draggable="false"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center text-3xl font-bold text-gray-400">
+              {{ profile.username.charAt(0).toUpperCase() }}
             </div>
           </div>
-
-          <!-- 基本信息 -->
-          <div class="flex-1 space-y-3">
-            <div>
-              <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                {{ profile.username }}
-              </h3>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                欢迎来到我的博客
-              </p>
-            </div>
-
-            <!-- 可见信息标签 -->
-            <div class="flex flex-wrap gap-2">
-              <!-- 性别 -->
-              <span
-                v-if="isFieldFilled('gender') && isFieldVisible('gender')"
-                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-              >
-                <i :class="['ph', getGenderIcon(profile.gender), 'text-sm']"></i>
-                {{ getGenderText(profile.gender) }}
-              </span>
-
-              <!-- 年龄 -->
-              <span
-                v-if="isFieldFilled('age') && isFieldVisible('age')"
-                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800"
-              >
-                <i class="ph ph-calendar text-sm"></i>
-                {{ profile.age }} 岁
-              </span>
-
-              <!-- 邮箱 -->
-              <span
-                v-if="isFieldFilled('email') && isFieldVisible('email')"
-                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800"
-              >
-                <i class="ph ph-envelope text-sm"></i>
-                {{ profile.email }}
-              </span>
-
-              <!-- 手机号 -->
-              <span
-                v-if="isFieldFilled('phone') && isFieldVisible('phone')"
-                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800"
-              >
-                <i class="ph ph-phone text-sm"></i>
-                {{ profile.phone }}
-              </span>
-
-              <!-- QQ -->
-              <span
-                v-if="isFieldFilled('qq') && isFieldVisible('qq')"
-                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800"
-              >
-                <i class="ph ph-qq-logo text-sm"></i>
-                QQ: {{ profile.qq }}
-              </span>
-
-              <!-- 微信 -->
-              <span
-                v-if="isFieldFilled('wechat') && isFieldVisible('wechat')"
-                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-              >
-                <i class="ph ph-wechat-logo text-sm"></i>
-                {{ profile.wechat }}
-              </span>
-            </div>
-
-            <!-- 社交链接 -->
-            <div v-if="isFieldFilled('github') || isFieldFilled('gitee')" class="flex gap-2">
-              <!-- GitHub -->
-              <a
-                v-if="isFieldFilled('github') && isFieldVisible('github')"
-                :href="`https://github.com/${profile.github}`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors border border-gray-700 dark:border-gray-600"
-              >
-                <i class="ph ph-github-logo text-sm"></i>
-                GitHub
-              </a>
-
-              <!-- Gitee -->
-              <a
-                v-if="isFieldFilled('gitee') && isFieldVisible('gitee')"
-                :href="`https://gitee.com/${profile.gitee}`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors border border-red-700"
-              >
-                <i class="ph ph-git-branch text-sm"></i>
-                Gitee
-              </a>
-            </div>
+          <div
+              v-if="showFullFeatures && isHovering && hasCustomAvatar"
+              class="absolute inset-0 bg-black/60 flex items-center justify-center rounded-full cursor-pointer backdrop-blur-sm"
+          >
+            <i class="ph ph-camera text-white text-xl"></i>
           </div>
         </div>
+
+        <!-- 用户名 -->
+        <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-1">
+          {{ profile.username }}
+        </h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          欢迎来到我的博客
+        </p>
+      </div>
+
+      <!-- 信息标签 - 紧凑布局 -->
+      <div class="px-4 pb-4 space-y-2">
+        <!-- 性别 -->
+        <div
+            v-if="isFieldFilled('gender') && isFieldVisible('gender')"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <i :class="['ph', getGenderIcon(profile.gender), 'text-blue-500 dark:text-blue-400']"></i>
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ getGenderText(profile.gender) }}</span>
+        </div>
+
+        <!-- 年龄 -->
+        <div
+            v-if="isFieldFilled('age') && isFieldVisible('age')"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <i class="ph ph-calendar text-green-500 dark:text-green-400"></i>
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ profile.age }} 岁</span>
+        </div>
+
+        <!-- QQ -->
+        <div
+            v-if="isFieldFilled('qq') && isFieldVisible('qq')"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <i class="ph ph-qq-logo text-cyan-500 dark:text-cyan-400"></i>
+          <span class="text-sm text-gray-500 dark:text-gray-400">QQ:</span>
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ profile.qq }}</span>
+        </div>
+
+        <!-- 微信 -->
+        <div
+            v-if="isFieldFilled('wechat') && isFieldVisible('wechat')"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <i class="ph ph-wechat-logo text-emerald-500 dark:text-emerald-400"></i>
+          <span class="text-sm text-gray-500 dark:text-gray-400">微信:</span>
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ profile.wechat }}</span>
+        </div>
+
+        <!-- 邮箱 -->
+        <div
+            v-if="isFieldFilled('email') && isFieldVisible('email')"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <i class="ph ph-envelope text-purple-500 dark:text-purple-400"></i>
+          <span class="text-sm text-gray-500 dark:text-gray-400">邮箱:</span>
+          <span class="text-sm text-gray-700 dark:text-gray-300 truncate">{{ profile.email }}</span>
+        </div>
+
+        <!-- 手机号 -->
+        <div
+            v-if="isFieldFilled('phone') && isFieldVisible('phone')"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+        >
+          <i class="ph ph-phone text-orange-500 dark:text-orange-400"></i>
+          <span class="text-sm text-gray-500 dark:text-gray-400">手机:</span>
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ profile.phone }}</span>
+        </div>
+      </div>
+
+      <!-- 社交链接 -->
+      <div
+          v-if="isFieldFilled('github') || isFieldFilled('gitee')"
+          class="px-4 pb-4 flex gap-2"
+      >
+        <a
+            v-if="isFieldFilled('github') && isFieldVisible('github')"
+            :href="`https://github.com/${profile.github}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[#24292e] hover:bg-[#1c2127] text-white transition-all shadow-sm active:scale-95"
+        >
+          <i class="ph ph-github-logo"></i>
+          <span>GitHub</span>
+        </a>
+
+        <a
+            v-if="isFieldFilled('gitee') && isFieldVisible('gitee')"
+            :href="`https://gitee.com/${profile.gitee}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[#c71d23] hover:bg-[#a91920] text-white transition-all shadow-sm active:scale-95"
+        >
+          <i class="ph ph-git-branch"></i>
+          <span>Gitee</span>
+        </a>
       </div>
     </div>
 
-    <!-- 字段完成度 -->
-    <div class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
-      <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-6">
-        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-          <i class="ph ph-chart-bar text-lg"></i>
-          信息完整度
-        </h2>
+    <!-- 信息完整度卡片 -->
+    <div
+        v-if="showFullFeatures"
+        class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-white/5 p-4"
+    >
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-chart-bar text-gray-400"></i>
+        <h3 class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">信息完整度</h3>
       </div>
 
-      <div class="p-6 space-y-4">
+      <div class="space-y-2">
         <div class="flex items-center justify-between text-sm">
-          <span class="text-gray-600 dark:text-gray-400">已填写字段</span>
-          <span class="font-medium text-gray-800 dark:text-gray-200">
+          <span class="text-gray-600 dark:text-gray-400">已填写</span>
+          <span class="font-bold text-gray-800 dark:text-gray-200">
             {{
               [
                 profile.gender,
@@ -190,16 +254,14 @@ const getGenderIcon = (gender: string | null) => {
                 profile.github,
                 profile.gitee,
               ].filter(Boolean).length
-            }}
-            / 8
+            }} / 8
           </span>
         </div>
 
-        <!-- 进度条 -->
-        <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div class="w-full h-2 bg-gray-200 dark:bg-gray-700/50 rounded-full overflow-hidden">
           <div
-            class="h-full bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 transition-all duration-500"
-            :style="{
+              class="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500 rounded-full"
+              :style="{
               width: `${
                 [
                   profile.gender,
@@ -215,72 +277,77 @@ const getGenderIcon = (gender: string | null) => {
             }"
           ></div>
         </div>
-
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-          完善个人信息可以让他人更好地了解你
-        </p>
       </div>
     </div>
 
-    <!-- 快速操作 -->
-    <div class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden">
-      <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-6">
-        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-          <i class="ph ph-lightning text-lg"></i>
-          快速操作
-        </h2>
+    <!-- 快速操作卡片 -->
+    <div
+        v-if="showFullFeatures"
+        class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-white/5 p-4"
+    >
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-lightning text-gray-400"></i>
+        <h3 class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">快速操作</h3>
       </div>
 
-      <div class="p-6 grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 gap-2">
         <button
-          class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-          @click="$emit('edit-avatar')"
+            class="flex flex-col items-center gap-2 p-3 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-95"
+            @click="$emit('edit-avatar')"
         >
-          <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-            <i class="ph ph-image text-blue-500 dark:text-blue-400 text-xl"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-800 dark:text-gray-200">设置头像</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">上传你的头像</div>
-          </div>
+          <i class="ph ph-image text-blue-500 text-xl"></i>
+          <span class="text-xs text-gray-700 dark:text-gray-300">头像</span>
         </button>
 
         <button
-          class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-          @click="$emit('edit-basic')"
+            class="flex flex-col items-center gap-2 p-3 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-95"
+            @click="$emit('edit-basic')"
         >
-          <div class="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
-            <i class="ph ph-identification-card text-green-500 dark:text-green-400 text-xl"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-800 dark:text-gray-200">基本信息</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">昵称、性别、年龄</div>
-          </div>
+          <i class="ph ph-identification-card text-green-500 text-xl"></i>
+          <span class="text-xs text-gray-700 dark:text-gray-300">基本</span>
         </button>
 
         <button
-          class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-          @click="$emit('edit-contact')"
+            class="flex flex-col items-center gap-2 p-3 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-95"
+            @click="$emit('edit-contact')"
         >
-          <div class="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center">
-            <i class="ph ph-address-book text-purple-500 dark:text-purple-400 text-xl"></i>
-          </div>
-          <div>
-            <div class="text-sm font-medium text-gray-800 dark:text-gray-200">联系方式</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">邮箱、手机、QQ</div>
-          </div>
+          <i class="ph ph-address-book text-purple-500 text-xl"></i>
+          <span class="text-xs text-gray-700 dark:text-gray-300">联系</span>
         </button>
 
         <button
-          class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-          @click="$emit('edit-social')"
+            class="flex flex-col items-center gap-2 p-3 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-95"
+            @click="$emit('edit-social')"
         >
-          <div class="w-10 h-10 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
-            <i class="ph ph-link text-orange-500 dark:text-orange-400 text-xl"></i>
+          <i class="ph ph-link text-orange-500 text-xl"></i>
+          <span class="text-xs text-gray-700 dark:text-gray-300">社交</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Blog 个人栏快捷入口 -->
+    <div
+      v-else-if="blogQuickActions.length"
+      class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-white/5 p-4"
+    >
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-lightning text-gray-400"></i>
+        <h3 class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">快速操作</h3>
+      </div>
+
+      <div class="grid grid-cols-1 gap-2">
+        <button
+          v-for="item in blogQuickActions"
+          :key="item.id"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-[0.99] text-left"
+          @click="openBlogQuickAction(item)"
+        >
+          <div class="w-9 h-9 rounded-lg bg-[#007AFF]/10 flex items-center justify-center flex-shrink-0">
+            <i :class="['ph', item.icon, 'text-[#007AFF]', 'text-lg']"></i>
           </div>
-          <div>
-            <div class="text-sm font-medium text-gray-800 dark:text-gray-200">社交链接</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">GitHub、Gitee</div>
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ item.title }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ item.description || '' }}</div>
           </div>
         </button>
       </div>

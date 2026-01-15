@@ -78,6 +78,7 @@ const fetchPost = async () => {
     const data = await getPost(props.postId)
     post.value = data
     localLikes.value = data.likes
+    hasLiked.value = false
 
     // 增加浏览量
     await incrementViews(props.postId)
@@ -88,6 +89,19 @@ const fetchPost = async () => {
     loading.value = false
   }
 }
+
+// 监听 postId 变化，重新获取文章
+watch(() => props.postId, (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    // 重置状态
+    localLikes.value = 0
+    hasLiked.value = false
+    headings.value = []
+    showHeaderTitle.value = true
+    // 重新获取文章
+    fetchPost()
+  }
+})
 
 // 点赞
 const handleLike = () => {
@@ -148,19 +162,28 @@ const handleCommentSubmitted = (data: {
 onMounted(() => {
   const prevHtmlOverflow = document.documentElement.style.overflow
   const prevBodyOverflow = document.body.style.overflow
+  const prevHtmlClass = document.documentElement.className
+  const prevBodyClass = document.body.className
+  
   document.documentElement.style.overflow = 'hidden'
   document.body.style.overflow = 'hidden'
+  document.documentElement.classList.add('scrollbar-hide')
+  document.body.classList.add('scrollbar-hide')
 
   onBeforeUnmount(() => {
     document.documentElement.style.overflow = prevHtmlOverflow
     document.body.style.overflow = prevBodyOverflow
+    document.documentElement.className = prevHtmlClass
+    document.body.className = prevBodyClass
   })
 
   fetchPost()
 
   const hasVisited = localStorage.getItem('article-detail-first-visited')
   if (!hasVisited) {
-    showFirstVisitGuide.value = true
+    nextTick(() => {
+      showFirstVisitGuide.value = true
+    })
   }
 })
 
@@ -173,7 +196,7 @@ watch(() => props.isSidebarOpen, async () => {
 </script>
 
 <template>
-  <div class="h-screen h-[100dvh] overflow-hidden bg-[#f5f5f700] dark:bg-[#12121200] transition-colors duration-300 font-sans selection:bg-blue-100 selection:text-blue-900">
+  <div class="h-[100dvh] overflow-hidden bg-[#f5f5f700] dark:bg-[#12121200] transition-colors duration-300 font-sans selection:bg-blue-100 selection:text-blue-900">
 
     <div v-if="loading" class="fixed inset-0 pt-32 flex items-start justify-center">
     </div>
@@ -199,7 +222,7 @@ watch(() => props.isSidebarOpen, async () => {
       />
 
       <!-- 固定视口容器：左侧滚动，右侧固定 -->
-      <main class="fixed inset-0 pt-8 overflow-hidden z-10 transition-all duration-300"
+      <main class="fixed inset-0 pt-8 h-[calc(100dvh-2rem)] overflow-hidden z-10 transition-all duration-300"
             :class="isSidebarOpen ? 'left-64' : 'left-0'">
         <div class="h-full w-full px-4 sm:px-6">
           <div class="flex h-full gap-6 2xl:gap-8">
@@ -300,8 +323,11 @@ watch(() => props.isSidebarOpen, async () => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: rgba(156, 163, 175, 0.2);
   border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  opacity: 1;
   background-color: rgba(156, 163, 175, 0.4);
 }
 

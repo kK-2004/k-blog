@@ -4,9 +4,12 @@ import type { Post, AdminMe } from '@/api/types'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import { useReadStats } from '@/composables/useReadStats'
 import { useHashRouter } from '@/composables/useHashRouter'
+import { useMessage } from '@/composables/useMessage'
 import AvatarCircle from './AvatarCircle.vue'
 import { incrementLikes, incrementViews } from '@/api/posts'
 import { createPostComment, createPostCommentReply, likePostComment, listPostComments } from '@/api/comments'
+
+const { success } = useMessage()
 
 type ReplyItem = {
   id: number
@@ -186,6 +189,11 @@ const showExpandBtn = computed(() => {
   return text.length > 100 || text.includes('```')
 })
 
+const shouldShowFloatingButtons = computed(() => {
+  const text = props.post.content || ''
+  return text.length > 200
+})
+
 const readStats = useReadStats(computed(() => props.post.content))
 
 const EXPAND_EVENT = 'mac-blog-card:expand'
@@ -312,12 +320,7 @@ const onInnerScroll = () => {
   })
 }
 
-watchEffect(() => {
-  if (!showExpandBtn.value) {
-    isExpanded.value = true
-    isVisuallyExpanded.value = true
-  }
-})
+
 
 watch(
     () => props.post.id,
@@ -506,6 +509,23 @@ const handleArticleLike = () => {
   window.setTimeout(() => {
     likeBouncing.value = false
   }, 280)
+}
+
+const handleShare = async () => {
+  const url = window.location.href.split('#')[0] + `#/article/${props.post.id}`
+  try {
+    await navigator.clipboard.writeText(url)
+    success('链接已复制到剪贴板')
+  } catch {
+    // 降级方案
+    const textarea = document.createElement('textarea')
+    textarea.value = url
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    success('链接已复制到剪贴板')
+  }
 }
 
 const handleCommentClick = async () => {
@@ -875,6 +895,7 @@ const closeCollapseHint = () => {
                 :src="authorAvatarUrl"
                 :alt="post.author"
                 class="w-10 h-10 rounded-full object-cover shadow-sm"
+                draggable="false"
               />
               <AvatarCircle v-else :name="post.author" size="lg" />
               <div class="flex-1">
@@ -1018,6 +1039,7 @@ const closeCollapseHint = () => {
                       :src="getCommenterAvatarUrl(comment.user)!"
                       :alt="comment.user"
                       class="w-8 h-8 rounded-full object-cover shadow-sm shrink-0 mt-1"
+                      draggable="false"
                   />
                   <AvatarCircle v-else :name="comment.user" size="md" class="shrink-0 mt-1" />
 
@@ -1075,6 +1097,7 @@ const closeCollapseHint = () => {
                           :src="getCommenterAvatarUrl(reply.user)!"
                           :alt="reply.user"
                           class="w-6 h-6 rounded-full object-cover shadow-sm shrink-0 mt-1"
+                          draggable="false"
                       />
                       <AvatarCircle v-else :name="reply.user" size="xs" class="shrink-0 mt-1" />
                       <div class="min-w-0 flex-1">
@@ -1233,14 +1256,14 @@ const closeCollapseHint = () => {
           </button>
         </div>
 
-        <button class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors inline-flex items-center justify-center w-5 h-5" title="分享">
+        <button class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors inline-flex items-center justify-center w-5 h-5" title="分享" @click="handleShare">
           <i class="ph ph-share-network text-xl"></i>
         </button>
       </div>
 
       <!-- 浮动操作按钮 - 优化版 -->
       <div
-          v-if="isExpanded"
+          v-if="isExpanded && shouldShowFloatingButtons"
           class="fixed right-8 bottom-20 flex flex-col gap-3 z-50 transition-all duration-500"
           :class="{ 'bottom-28': isVisuallyExpanded }"
       >
@@ -1379,17 +1402,20 @@ const closeCollapseHint = () => {
 .mac-summary--open::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
+  opacity: 0;
+  transition: opacity 0.3s ease, background 0.3s ease;
 }
 
 .dark .mac-summary--open::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.mac-summary--open::-webkit-scrollbar-thumb:hover {
+.mac-summary--open:hover::-webkit-scrollbar-thumb {
+  opacity: 1;
   background: rgba(0, 0, 0, 0.2);
 }
 
-.dark .mac-summary--open::-webkit-scrollbar-thumb:hover {
+.dark .mac-summary--open:hover::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
 }
 

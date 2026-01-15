@@ -84,7 +84,7 @@ const handleSubmit = async () => {
         user: created.user,
         text: created.text,
         rootId: replyingTo.value.rootId,
-        toUser: created.toUser,
+        toUser: created.toUser ?? undefined,
       })
     } else {
       // 提交评论

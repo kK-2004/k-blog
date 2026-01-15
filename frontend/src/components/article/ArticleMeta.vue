@@ -37,6 +37,7 @@ const formattedDate = computed(() => {
         v-if="authorAvatarUrl"
         :src="authorAvatarUrl"
         :alt="author"
+        draggable="false"
         class="w-10 h-10 rounded-full object-cover shadow-sm"
       />
       <AvatarCircle v-else :name="author" size="lg" />

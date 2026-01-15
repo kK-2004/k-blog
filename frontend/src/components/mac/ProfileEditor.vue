@@ -11,7 +11,7 @@ const props = defineProps<{
 }>()
 
 const { profile, loadProfile, saveProfile, updateVisibility, isFieldVisible, isFieldFilled } = useUserProfile()
-const { avatarUrl, hasCustomAvatar, uploadAvatar, removeAvatar } = useUserAvatar()
+const { avatarUrl, hasCustomAvatar, uploadAvatar, removeAvatar } = useUserAvatar(true)
 const { success: showSuccess, error: showError } = useMessage()
 
 // 表单状态

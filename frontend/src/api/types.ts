@@ -39,6 +39,17 @@ export type MenuItem = {
   order: number
 }
 
+export type QuickAction = {
+  id: string
+  title: string
+  description: string | null
+  icon: string
+  targetType: 'internal' | 'external'
+  target: string
+  visible: boolean
+  order: number
+}
+
 export type AdminMe = {
   id: number
   username: string

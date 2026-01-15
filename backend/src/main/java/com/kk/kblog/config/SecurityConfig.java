@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/login", "/api/admin/logout").permitAll()
                         .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/site/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/posts").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/posts/*").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/posts/*").authenticated()

@@ -20,6 +20,7 @@ const { theme, toggleTheme, bgStyle } = useTheme()
 const { currentView, navigateTo, articleId } = useHashRouter()
 
 const isSidebarOpen = ref(false)
+const mainRef = ref<HTMLElement | null>(null)
 const posts = ref<Post[]>([])
 const isAuthenticated = ref(false)
 const adminMe = ref<AdminMe | null>(null)
@@ -102,7 +103,7 @@ onMounted(async () => {
 <template>
   <div :class="theme" class="transition-colors duration-500 ease-in-out h-full">
     <div
-      class="min-h-screen bg-[#f5f5f7] dark:bg-black font-sans text-[#1d1d1f] dark:text-[#f5f5f7] pt-8 transition-colors duration-500 overflow-x-hidden relative"
+      class="h-screen bg-[#f5f5f7] dark:bg-black font-sans text-[#1d1d1f] dark:text-[#f5f5f7] pt-8 transition-colors duration-500 overflow-hidden relative"
       :style="bgStyle"
     >
       <div class="absolute inset-0 bg-white/30 dark:bg-black/40 pointer-events-none"></div>
@@ -124,7 +125,8 @@ onMounted(async () => {
       />
 
       <main
-        class="relative z-10 max-w-4xl mx-auto p-6 mt-6 min-h-[80vh] transition-transform duration-300 ease-out"
+        ref="mainRef"
+        class="relative z-10 max-w-4xl mx-auto p-6 mt-6 h-[calc(100vh-8rem)] overflow-y-auto mac-scrollbar transition-transform duration-300 ease-out"
         :class="[
           isSidebarOpen ? 'translate-x-32' : 'translate-x-0'
         ]"
@@ -134,6 +136,7 @@ onMounted(async () => {
           :isAuthenticated="isAuthenticated"
           :adminMe="adminMe"
           :authorAvatarUrl="authorAvatarUrl"
+          :scrollContainer="mainRef"
         />
         <LoginView v-else-if="currentView === 'login'" @login-success="onLoginSuccess" />
         <AdminView

@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useUserAvatar } from '@/composables/useUserAvatar'
 import { useMessage } from '@/composables/useMessage'
 
-const { avatarUrl, hasCustomAvatar, uploadAvatar, removeAvatar, loadAvatar, isLoading } = useUserAvatar()
+const { avatarUrl, hasCustomAvatar, uploadAvatar, removeAvatar, loadAvatar, isLoading } = useUserAvatar(true)
 const { success: showSuccess, error: showError } = useMessage()
 
 const fileInput = ref<HTMLInputElement | null>(null)

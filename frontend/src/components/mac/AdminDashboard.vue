@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { Post } from '@/api/types'
+import { onMounted, ref } from 'vue'
+import type { Post, QuickAction } from '@/api/types'
 import AdminEditor from './AdminEditor.vue'
 import ProfileCenter from '@/views/ProfileCenter.vue'
 import { createPost, deletePost as apiDeletePost, listPosts, updatePost } from '@/api/posts'
+import { useHashRouter } from '@/composables/useHashRouter'
+import { listVisibleQuickActions } from '@/api/site'
+
+const router = useHashRouter()
 
 const props = defineProps<{
   posts: Post[]
@@ -21,6 +25,25 @@ const isEditorOpen = ref(false)
 const currentEditId = ref<number | null>(null)
 const editorContent = ref('')
 const isCreating = ref(false)
+
+const quickActions = ref<QuickAction[]>([])
+
+const loadQuickActions = async () => {
+  try {
+    quickActions.value = await listVisibleQuickActions()
+  } catch {
+    quickActions.value = []
+  }
+}
+
+const openQuickAction = (item: QuickAction) => {
+  if (item.targetType === 'internal') {
+    const hash = item.target.startsWith('#') ? item.target : `#${item.target}`
+    window.location.hash = hash
+    return
+  }
+  window.open(item.target, '_blank', 'noopener,noreferrer')
+}
 
 const openEditor = (post: Post) => {
   currentEditId.value = post.id
@@ -91,6 +114,14 @@ const formatNumber = (num: number): string => {
   }
   return num.toString()
 }
+
+const navigateToArticle = (postId: number) => {
+  router.navigateTo('article', { articleId: postId })
+}
+
+onMounted(() => {
+  void loadQuickActions()
+})
 </script>
 
 <template>
@@ -123,6 +154,30 @@ const formatNumber = (num: number): string => {
 
     <!-- 文章管理视图 -->
     <div v-if="currentView === 'posts'" class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden min-h-[500px]">
+      <div v-if="quickActions.length" class="p-6 border-b border-gray-200 dark:border-gray-700 bg-white/40 dark:bg-black/10">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+            <i class="ph ph-lightning text-lg"></i>
+            快速操作
+          </h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <button
+            v-for="item in quickActions"
+            :key="item.id"
+            class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+            @click="openQuickAction(item)"
+          >
+            <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+              <i :class="['ph', item.icon, 'text-blue-500 dark:text-blue-400 text-xl']"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ item.title }}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ item.description || '' }}</div>
+            </div>
+          </button>
+        </div>
+      </div>
       <div class="h-12 bg-gray-100/50 dark:bg-[#333]/50 border-b border-gray-200 dark:border-gray-700 flex items-center px-6 justify-between">
         <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
           <i class="ph ph-squares-four text-lg"></i>
@@ -146,15 +201,16 @@ const formatNumber = (num: number): string => {
           <tr
               v-for="post in props.posts"
               :key="post.id"
-              class="transition-colors group"
+              class="transition-colors group cursor-pointer"
               :class="{
                 'hover:bg-blue-50/50 dark:hover:bg-blue-900/10': !post.pinned,
                 'bg-amber-50/30 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20': post.pinned
               }"
+              @click="navigateToArticle(post.id)"
           >
             <td class="p-4 pl-6">
               <div class="flex items-center gap-2">
-                <div class="font-medium text-gray-800 dark:text-gray-200 text-sm">{{ post.title }}</div>
+                <div class="font-medium text-gray-800 dark:text-gray-200 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ post.title }}</div>
               </div>
               <div class="text-xs text-gray-400 truncate w-48">{{ post.content.substring(0, 30) }}...</div>
             </td>
@@ -180,14 +236,14 @@ const formatNumber = (num: number): string => {
                     class="p-2 transition-colors rounded"
                     :class="post.pinned ? 'text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'"
                     title="置顶"
-                    @click="togglePin(post.id)"
+                    @click.stop="togglePin(post.id)"
                 >
                   <i class="ph ph-push-pin"></i>
                 </button>
-                <button class="p-2 text-blue-500 hover:bg-blue-100 rounded dark:hover:bg-blue-900/30 transition-colors" title="编辑" @click="openEditor(post)">
+                <button class="p-2 text-blue-500 hover:bg-blue-100 rounded dark:hover:bg-blue-900/30 transition-colors" title="编辑" @click.stop="openEditor(post)">
                   <i class="ph ph-pencil-simple"></i>
                 </button>
-                <button class="p-2 text-red-500 hover:bg-red-100 rounded dark:hover:bg-red-900/30 transition-colors" title="删除" @click="deletePost(post.id)">
+                <button class="p-2 text-red-500 hover:bg-red-100 rounded dark:hover:bg-red-900/30 transition-colors" title="删除" @click.stop="deletePost(post.id)">
                   <i class="ph ph-trash"></i>
                 </button>
               </div>
