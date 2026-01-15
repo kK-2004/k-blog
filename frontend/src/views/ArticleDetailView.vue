@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { getPost, incrementLikes, incrementViews } from '@/api/posts'
 import { useReadStats } from '@/composables/useReadStats'
 import { useScrollProgress } from '@/composables/useScrollProgress'
@@ -14,6 +14,8 @@ import ArticleTOC from '@/components/article/ArticleTOC.vue'
 import ArticleInteractionBar from '@/components/article/ArticleInteractionBar.vue'
 import AiSummaryCard from '@/components/article/AiSummaryCard.vue'
 import CommentSection from '@/components/comment/CommentSection.vue'
+import FirstVisitGuide from '@/components/article/FirstVisitGuide.vue'
+import ArticleNotFound from '@/components/article/ArticleNotFound.vue'
 
 // Props
 const props = defineProps<{
@@ -28,6 +30,14 @@ const props = defineProps<{
 const post = ref<Post | null>(null)
 const loading = ref(true)
 const error = ref(false)
+
+// 首次访问引导
+const showFirstVisitGuide = ref(false)
+const articleHeaderRef = ref<InstanceType<typeof ArticleHeader> | null>(null)
+
+const trafficLightRef = computed(() => {
+  return articleHeaderRef.value?.trafficLightContainer || null
+})
 
 // 滚动和头部状态
 const { scrollProgress, activeHeadingId } = useScrollProgress()
@@ -137,6 +147,18 @@ onMounted(() => {
   })
 
   fetchPost()
+
+  const hasVisited = localStorage.getItem('article-detail-first-visited')
+  if (!hasVisited) {
+    showFirstVisitGuide.value = true
+  }
+})
+
+// 监听侧边栏状态变化，更新引导框位置
+watch(() => props.isSidebarOpen, async () => {
+  if (showFirstVisitGuide.value) {
+    await nextTick()
+  }
 })
 </script>
 
@@ -145,19 +167,27 @@ onMounted(() => {
 
     <div v-if="loading" class="fixed inset-0 pt-32 flex items-start justify-center">
     </div>
-    <div v-else-if="error || !post" class="fixed inset-0 pt-32 flex items-start justify-center">
-    </div>
+    <ArticleNotFound v-else-if="error || !post" />
 
     <template v-else>
       <ArticleHeader
+          ref="articleHeaderRef"
           :post="post"
           :scrollProgress="scrollProgress"
           :showTitle="showHeaderTitle"
           :isSidebarOpen="isSidebarOpen"
       />
 
+      <FirstVisitGuide
+        v-if="showFirstVisitGuide"
+        :targetRef="trafficLightRef"
+        :isSidebarOpen="isSidebarOpen"
+        @close="showFirstVisitGuide = false"
+      />
+
       <!-- 固定视口容器：左侧滚动，右侧固定 -->
-      <main class="fixed inset-0 pt-2 overflow-hidden z-10">
+      <main class="fixed inset-0 pt-8 overflow-hidden z-10 transition-all duration-300"
+            :class="isSidebarOpen ? 'left-64' : 'left-0'">
         <div class="h-full w-full px-4 sm:px-6">
           <div class="flex h-full gap-6 2xl:gap-8">
 
@@ -166,7 +196,7 @@ onMounted(() => {
               <div class="max-w-[110rem] mx-auto py-6 pb-64">
 
                 <!-- 文章卡片 -->
-                <div class="rounded-xl border border-gray-200/60 dark:border-gray-800/60 overflow-hidden">
+                <div class="pl-20 rounded-xl border border-gray-200/60 dark:border-gray-800/60 overflow-hidden">
                   <div class="p-8 md:p-12 lg:p-14">
 
                     <ArticleMeta
@@ -272,14 +302,9 @@ onMounted(() => {
 
 /* 标题锚点偏移
   增加偏移量以避免被 Header 遮挡
-*/
+  */
 :deep(.prose h2[id]),
 :deep(.prose h3[id]) {
   scroll-margin-top: 140px;
-}
-
-/* 全局滚动平滑 */
-:deep(html) {
-  scroll-behavior: smooth;
 }
 </style>

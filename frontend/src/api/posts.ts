@@ -11,6 +11,11 @@ export async function listPosts(): Promise<Post[]> {
   return apiFetch<Post[]>('/api/posts')
 }
 
+export async function listPostsPage(page: number, size = 5): Promise<Post[]> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) })
+  return apiFetch<Post[]>(`/api/posts?${params.toString()}`)
+}
+
 export async function getPost(id: number): Promise<Post> {
   return apiFetch<Post>(`/api/posts/${id}`)
 }

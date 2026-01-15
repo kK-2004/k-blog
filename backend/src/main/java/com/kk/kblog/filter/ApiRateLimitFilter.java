@@ -31,7 +31,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 @Order(Ordered.HIGHEST_PRECEDENCE + 50)
 public class ApiRateLimitFilter extends OncePerRequestFilter {
 
-    private static final long BUCKET_CAPACITY = 10;
+    private static final long BUCKET_CAPACITY = 20;
     private static final long BUCKET_REFILL_RATE_PER_SEC = 1;
 
     private static final int BLACKLIST_THRESHOLD_PER_MINUTE = 100;

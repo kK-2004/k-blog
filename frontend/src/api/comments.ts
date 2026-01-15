@@ -39,3 +39,6 @@ export async function likePostComment(postId: number, commentId: number): Promis
   return apiFetch<LikeResponse>(`/api/posts/${postId}/comments/${commentId}/likes`, { method: 'POST' })
 }
 
+export async function deletePostComment(postId: number, commentId: number): Promise<void> {
+  return apiFetch<void>(`/api/posts/${postId}/comments/${commentId}`, { method: 'DELETE' })
+}

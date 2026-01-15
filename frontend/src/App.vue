@@ -89,10 +89,13 @@ watch(currentView, (newView) => {
   if ((newView === 'admin' || newView === 'settings') && !isAuthenticated.value) {
     navigateTo('login')
   }
+  if (newView === 'admin') {
+    refreshPosts()
+  }
 })
 
 onMounted(async () => {
-  await Promise.all([refreshPosts(), refreshAuth(), loadPublicProfile()])
+  await Promise.all([refreshAuth(), loadPublicProfile()])
 })
 </script>
 
@@ -128,7 +131,6 @@ onMounted(async () => {
       >
         <BlogView
           v-if="currentView === 'blog'"
-          :posts="posts"
           :isAuthenticated="isAuthenticated"
           :adminMe="adminMe"
           :authorAvatarUrl="authorAvatarUrl"
@@ -141,15 +143,17 @@ onMounted(async () => {
           @refresh="refreshPosts"
         />
         <SettingsView v-else-if="currentView === 'settings'" />
-        <ArticleDetailView
-          v-else-if="currentView === 'article'"
-          :postId="articleId!"
-          :isAuthenticated="isAuthenticated"
-          :adminMe="adminMe"
-          :authorAvatarUrl="authorAvatarUrl"
-          :isSidebarOpen="isSidebarOpen"
-        />
       </main>
+
+      <!-- ArticleDetailView 单独渲染，不受 main 容器宽度限制 -->
+      <ArticleDetailView
+        v-if="currentView === 'article'"
+        :postId="articleId!"
+        :isAuthenticated="isAuthenticated"
+        :adminMe="adminMe"
+        :authorAvatarUrl="authorAvatarUrl"
+        :isSidebarOpen="isSidebarOpen"
+      />
     </div>
   </div>
 </template>

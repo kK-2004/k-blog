@@ -476,6 +476,15 @@ const expand = () => {
     if (Math.abs(window.scrollY - target) <= 2) return
     void scrollCardToCenter({ durationMs: 180 })
   }, EXPAND_COLLAPSE_MS + 80)
+
+  // 检查是否首次展开，显示折叠提示
+  const storageKey = 'mac-blog-card-collapse-hint-shown'
+  if (!localStorage.getItem(storageKey)) {
+    setTimeout(() => {
+      showCollapseHint.value = true
+      updateHintPosition()
+    }, EXPAND_COLLAPSE_MS + 200)
+  }
 }
 
 const toggleExpand = () => {
@@ -738,6 +747,54 @@ const scrollToCommentInput = async () => {
   inputRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   inputRef.value?.querySelector('textarea')?.focus()
 }
+
+// 首次展开提示相关
+const showCollapseHint = ref(false)
+const yellowButtonRef = ref<HTMLElement | null>(null)
+const hintPosition = ref({ top: 0, left: 0 })
+const arrowPath = ref('')
+const svgSize = ref({ width: 0, height: 0 })
+const arrowTipPosition = ref({ x: 0, y: 0 })
+
+const updateHintPosition = () => {
+  if (!yellowButtonRef.value) return
+
+  const targetRect = yellowButtonRef.value.getBoundingClientRect()
+  const guideWidth = 260
+  const guideHeight = 100
+  const horizontalGap = 50  // 增加间距
+
+  // 提示框显示在黄灯按钮左侧
+  hintPosition.value = {
+    top: targetRect.top + targetRect.height / 2 - guideHeight / 2,
+    left: targetRect.left - guideWidth - horizontalGap
+  }
+
+  // SVG 箭头从提示框右侧指向黄灯按钮（使用曲线）
+  const arrowStartX = hintPosition.value.left + guideWidth
+  const arrowStartY = hintPosition.value.top + guideHeight / 2
+  const arrowEndX = targetRect.left - 5
+  const arrowEndY = targetRect.top + targetRect.height / 2
+
+  // 控制点，形成平滑的 S 形曲线
+  const controlX1 = arrowStartX - (arrowStartX - arrowEndX) * 0.3
+  const controlY1 = arrowStartY
+  const controlX2 = arrowEndX + (arrowStartX - arrowEndX) * 0.3
+  const controlY2 = arrowEndY
+
+  arrowTipPosition.value = { x: arrowEndX, y: arrowEndY }
+  arrowPath.value = `M ${arrowStartX} ${arrowStartY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${arrowEndX} ${arrowEndY}`
+
+  svgSize.value = {
+    width: Math.max(hintPosition.value.left + guideWidth + 50, targetRect.right + 100),
+    height: Math.max(hintPosition.value.top + guideHeight + 50, targetRect.bottom + 50)
+  }
+}
+
+const closeCollapseHint = () => {
+  localStorage.setItem('mac-blog-card-collapse-hint-shown', 'true')
+  showCollapseHint.value = false
+}
 </script>
 
 <template>
@@ -752,6 +809,7 @@ const scrollToCommentInput = async () => {
         <div class="flex gap-2">
           <div class="w-3 h-3 rounded-full bg-[#FF5F56] border border-black/10"></div>
           <button
+              ref="yellowButtonRef"
               type="button"
               class="w-3 h-3 rounded-full bg-[#FFBD2E] border border-black/10 hover:brightness-95 active:brightness-90 transition"
               title="展开/折叠"
@@ -1210,6 +1268,57 @@ const scrollToCommentInput = async () => {
       </div>
 
     </div>
+
+    <!-- 首次展开折叠提示 -->
+    <Teleport to="body">
+      <Transition name="fade-slide">
+        <div
+            v-if="showCollapseHint && arrowPath"
+            class="fixed z-[60] pointer-events-none"
+            :style="{
+              width: `${svgSize.width}px`,
+              height: `${svgSize.height}px`,
+              top: '0',
+              left: '0'
+            }"
+        >
+          <svg
+              :width="svgSize.width"
+              :height="svgSize.height"
+              style="overflow: visible;"
+          >
+            <path
+                :d="arrowPath"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="6,6"
+                class="text-yellow-500 dark:text-yellow-400"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            />
+          </svg>
+
+          <div
+              class="absolute pointer-events-auto"
+              :style="{ top: `${hintPosition.top}px`, left: `${hintPosition.left}px` }"
+          >
+            <div class="bg-white dark:bg-[#1c1c1e] border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-xl max-w-[260px]">
+              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
+                点击这里的 <span class="inline-flex items-center text-yellow-500 font-medium">🟡</span> 按钮可以折叠文章哦～
+              </p>
+
+              <button
+                  @click="closeCollapseHint"
+                  class="w-full py-2.5 px-4 bg-white hover:bg-gray-50 dark:hover:bg-white/5 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 text-sm font-medium rounded-xl transition-all duration-200 hover:shadow-md active:scale-95"
+              >
+                我知道啦 ✨
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -1343,5 +1452,21 @@ const scrollToCommentInput = async () => {
 
 .mac-line-clamp-2 {
   -webkit-line-clamp: 2;
+}
+
+/* 首次展开提示过渡动画 */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease-out;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
 }
 </style>

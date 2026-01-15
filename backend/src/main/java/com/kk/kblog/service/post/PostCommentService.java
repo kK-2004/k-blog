@@ -161,6 +161,27 @@ public class PostCommentService {
         return new LikeResponse(likes);
     }
 
+    @Transactional
+    public void delete(long postId, long commentId) {
+        var comment = postCommentRepository.findByIdAndPostId(commentId, postId)
+                .orElseThrow(() -> new EntityNotFoundException("comment not found: " + commentId));
+
+        int deletedCount = 1;
+        if (comment.getParentId() == null) {
+            // root: delete replies too
+            var replies = postCommentRepository.findByPostIdAndParentIdOrderByCreatedAtAscIdAsc(postId, commentId);
+            if (!replies.isEmpty()) {
+                postCommentRepository.deleteAll(replies);
+                deletedCount += replies.size();
+            }
+        }
+
+        postCommentRepository.delete(comment);
+        postHotCommentRepository.deleteById(postId); // invalidate hot cache if needed
+        postStatsJdbcRepository.decrementComments(postId, deletedCount);
+        log.info("post_comment_deleted postId={} commentId={} deletedCount={}", postId, commentId, deletedCount);
+    }
+
     private PostCommentDto.PostCommentReplyDto toReplyDto(PostCommentEntity entity) {
         return new PostCommentDto.PostCommentReplyDto(
                 entity.getId(),

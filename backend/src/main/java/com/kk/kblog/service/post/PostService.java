@@ -12,6 +12,7 @@ import jakarta.persistence.EntityNotFoundException;
 import java.util.HashMap;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostStatsJdbcRepository postStatsJdbcRepository;
     private final AdminUserRepository adminUserRepository;
+    private final Sort defaultSort = Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("id"));
 
     public PostService(PostRepository postRepository, PostStatsJdbcRepository postStatsJdbcRepository, AdminUserRepository adminUserRepository) {
         this.postRepository = postRepository;
@@ -37,7 +39,16 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public List<PostDto> listPosts() {
-        var posts = postRepository.findAll(Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("id")));
+        var posts = postRepository.findAll(defaultSort);
+        var authorNameById = preloadAuthorNames(posts);
+        return posts.stream().map(p -> toDto(p, authorNameById)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PostDto> listPosts(int page, int size) {
+        if (page < 0) throw new IllegalArgumentException("page must be >= 0");
+        if (size <= 0 || size > 100) throw new IllegalArgumentException("size must be between 1 and 100");
+        var posts = postRepository.findAll(PageRequest.of(page, size, defaultSort)).getContent();
         var authorNameById = preloadAuthorNames(posts);
         return posts.stream().map(p -> toDto(p, authorNameById)).toList();
     }

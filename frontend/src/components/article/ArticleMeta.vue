@@ -14,46 +14,51 @@ const props = defineProps<{
 
 // 格式化发布时间
 const formattedDate = computed(() => {
-  if (!props.createdAt) return ''
-  return new Date(props.createdAt).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long'
-  })
+  const ms = props.createdAt
+  if (typeof ms === 'number' && Number.isFinite(ms)) {
+    const diffMs = Date.now() - ms
+    if (diffMs < 60_000) return '刚刚'
+    const diffMinutes = Math.floor(diffMs / 60_000)
+    if (diffMinutes < 60) {
+      const rounded = Math.max(5, Math.floor(diffMinutes / 5) * 5)
+      return `${rounded}分钟前`
+    }
+    return new Date(ms).toLocaleString('zh-CN')
+  }
+  return ''
 })
 </script>
 
 <template>
   <div class="article-meta mb-10">
     <!-- 作者信息 -->
-    <div class="flex items-center gap-4 mb-6">
+    <div class="flex items-center gap-3 mb-3">
       <img
         v-if="authorAvatarUrl"
         :src="authorAvatarUrl"
         :alt="author"
-        class="w-14 h-14 rounded-full object-cover ring-2 ring-white dark:ring-white/10 shadow-lg"
+        class="w-10 h-10 rounded-full object-cover shadow-sm"
       />
-      <AvatarCircle v-else :name="author" size="xl" />
+      <AvatarCircle v-else :name="author" size="lg" />
 
-      <div>
-        <div class="font-bold text-gray-900 dark:text-gray-100 text-base">{{ author }}</div>
-        <div class="text-sm text-gray-500 dark:text-gray-400">{{ formattedDate }}</div>
+      <div class="flex-1">
+        <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ author }}</div>
+        <div class="text-xs text-gray-400 font-mono">{{ formattedDate }}</div>
       </div>
     </div>
 
     <!-- 统计信息 -->
-    <div class="flex flex-wrap items-center gap-5 text-sm text-gray-600 dark:text-gray-400 mb-6">
+    <div class="pt-2 flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400 font-mono">
       <span class="flex items-center gap-1.5">
-        <i class="ph ph-clock text-lg"></i>
+        <i class="ph ph-hourglass text-base text-gray-400"></i>
         {{ readTime }}
       </span>
       <span class="flex items-center gap-1.5">
-        <i class="ph ph-text-aa text-lg"></i>
+        <i class="ph ph-text-t text-base text-gray-400"></i>
         {{ wordCount }}
       </span>
       <span class="flex items-center gap-1.5">
-        <i class="ph ph-eye text-lg"></i>
+        <i class="ph ph-eye text-base text-gray-400"></i>
         {{ views }} 次阅读
       </span>
     </div>

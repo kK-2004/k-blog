@@ -7,15 +7,16 @@ import { ref, onMounted, onUnmounted } from 'vue'
 export function useScrollProgress() {
   const scrollProgress = ref(0)
   const activeHeadingId = ref('')
+  
+  let scrollContainer: HTMLElement | null = null
+  let headingsElements: NodeListOf<Element> | null = null
 
   const updateScrollProgress = () => {
-    // 查找正文滚动容器
-    const scrollContainer = document.querySelector('article.overflow-y-auto')
     if (!scrollContainer) return
 
-    const containerHeight = (scrollContainer as HTMLElement).clientHeight
-    const scrollHeight = (scrollContainer as HTMLElement).scrollHeight
-    const scrollTop = (scrollContainer as HTMLElement).scrollTop
+    const containerHeight = scrollContainer.clientHeight
+    const scrollHeight = scrollContainer.scrollHeight
+    const scrollTop = scrollContainer.scrollTop
 
     const documentHeight = scrollHeight - containerHeight
 
@@ -25,19 +26,13 @@ export function useScrollProgress() {
   }
 
   const updateActiveHeading = () => {
-    const headings = document.querySelectorAll('.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6')
-    const scrollContainer = document.querySelector('article.overflow-y-auto')
+    if (!scrollContainer || !headingsElements) return
 
-    if (!scrollContainer) return
+    const scrollTop = scrollContainer.scrollTop
+    const scrollPosition = scrollTop + 150
 
-    const containerTop = (scrollContainer as HTMLElement).getBoundingClientRect().top
-    const scrollTop = (scrollContainer as HTMLElement).scrollTop
-
-    // 找到当前视口中最近的标题
     let currentHeading = ''
-    const scrollPosition = scrollTop + 150 // 偏移量，用于更准确的判断
-
-    for (const heading of headings) {
+    for (const heading of headingsElements) {
       if (heading instanceof HTMLElement && heading.offsetTop <= scrollPosition) {
         currentHeading = heading.id
       }
@@ -53,27 +48,36 @@ export function useScrollProgress() {
     updateActiveHeading()
   }
 
+  let inThrottle = false
+  const throttledHandleScroll = () => {
+    if (!inThrottle) {
+      handleScroll()
+      inThrottle = true
+      setTimeout(() => {
+        inThrottle = false
+      }, 100)
+    }
+  }
+
   onMounted(() => {
-    // 延迟绑定，确保 DOM 已渲染
     setTimeout(() => {
-      const scrollContainer = document.querySelector('article.overflow-y-auto')
+      scrollContainer = document.querySelector('article.overflow-y-auto') as HTMLElement
+      headingsElements = document.querySelectorAll('.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6')
+      
       if (scrollContainer) {
-        scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+        scrollContainer.addEventListener('scroll', throttledHandleScroll, { passive: true })
       } else {
-        // 降级：如果没有找到容器，使用 window
-        window.addEventListener('scroll', handleScroll, { passive: true })
+        window.addEventListener('scroll', throttledHandleScroll, { passive: true })
       }
-      // 初始化
       handleScroll()
     }, 100)
   })
 
   onUnmounted(() => {
-    const scrollContainer = document.querySelector('article.overflow-y-auto')
     if (scrollContainer) {
-      scrollContainer.removeEventListener('scroll', handleScroll)
+      scrollContainer.removeEventListener('scroll', throttledHandleScroll)
     } else {
-      window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('scroll', throttledHandleScroll)
     }
   })
 

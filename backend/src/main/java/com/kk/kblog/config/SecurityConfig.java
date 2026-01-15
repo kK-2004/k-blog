@@ -31,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/posts/*").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/posts/*").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/posts/*").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/posts/*/comments/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(ex -> ex

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 export interface Heading {
   id: string
   text: string
@@ -19,16 +21,8 @@ const scrollToHeading = (id: string) => {
   const scrollContainer = document.querySelector('article.overflow-y-auto')
 
   if (el && scrollContainer) {
-    const containerRect = (scrollContainer as HTMLElement).getBoundingClientRect()
-    const elementRect = el.getBoundingClientRect()
-    const offset = 100
-
-    // 计算元素相对于滚动容器的位置
-    const scrollTop = (scrollContainer as HTMLElement).scrollTop
-    const elementPosition = scrollTop + elementRect.top - containerRect.top - offset
-
     (scrollContainer as HTMLElement).scrollTo({
-      top: elementPosition,
+      top: Math.max(0, el.offsetTop - 70),
       behavior: 'smooth'
     })
 
@@ -37,7 +31,7 @@ const scrollToHeading = (id: string) => {
 }
 
 const getHeadingClass = (heading: Heading) => {
-  const baseClass = 'block text-sm py-1.5 transition-all duration-200 border-l-2 -ml-[21px] pl-[19px]'
+  const baseClass = 'block text-sm py-1.5 transition-all duration-200 border-l-2 -ml-[21px] pl-[19px] cursor-pointer'
 
   if (props.activeId === heading.id) {
     return `${baseClass} text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-medium`
@@ -45,6 +39,14 @@ const getHeadingClass = (heading: Heading) => {
 
   return `${baseClass} text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-white/20`
 }
+
+const headingClassMap = computed(() => {
+  const map = new Map<string, string>()
+  props.headings.forEach(heading => {
+    map.set(heading.id, getHeadingClass(heading))
+  })
+  return map
+})
 </script>
 
 <template>
@@ -57,7 +59,7 @@ const getHeadingClass = (heading: Heading) => {
         <a
           href="#"
           @click.prevent="scrollToHeading(heading.id)"
-          :class="getHeadingClass(heading)"
+          :class="headingClassMap.get(heading.id)"
         >
           {{ heading.text }}
         </a>

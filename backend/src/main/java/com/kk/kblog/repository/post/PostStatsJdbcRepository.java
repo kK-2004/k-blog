@@ -23,4 +23,9 @@ public class PostStatsJdbcRepository {
     public int incrementComments(long postId) {
         return jdbcTemplate.update("UPDATE posts SET comments = comments + 1 WHERE id = ?", postId);
     }
+
+    public int decrementComments(long postId, int delta) {
+        if (delta <= 0) return 0;
+        return jdbcTemplate.update("UPDATE posts SET comments = GREATEST(0, comments - ?) WHERE id = ?", delta, postId);
+    }
 }

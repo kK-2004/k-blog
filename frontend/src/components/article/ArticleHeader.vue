@@ -14,12 +14,18 @@ const props = defineProps<{
 const isMounted = ref(false)
 const router = useHashRouter()
 
+const trafficLightContainer = ref<HTMLElement | null>(null)
+
 const handleBack = () => {
   router.navigateTo('blog')
 }
 
 onMounted(() => {
   isMounted.value = true
+})
+
+defineExpose({
+  trafficLightContainer
 })
 </script>
 
@@ -51,6 +57,7 @@ onMounted(() => {
       <div class="max-w-7xl mx-auto px-4 h-full flex items-center justify-between pointer-events-auto">
         <!-- 左侧：返回按钮（macOS 风格红绿灯） -->
         <div
+          ref="trafficLightContainer"
           class="flex gap-2 group cursor-pointer p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition"
           @click="handleBack"
           title="返回列表"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { listPostComments, likePostComment } from '@/api/comments'
+import { listPostComments, likePostComment, deletePostComment } from '@/api/comments'
 import AvatarCircle from '@/components/mac/AvatarCircle.vue'
 import type { AdminMe } from '@/api/types'
 
@@ -39,6 +39,7 @@ const comments = ref<CommentItem[]>([])
 const commentsLoading = ref(false)
 const commentsHasMore = ref(false)
 const COMMENTS_PAGE_SIZE = 5
+const isAdmin = computed(() => props.isAuthenticated && !!props.adminMe)
 
 // 格式化评论时间
 const formatCommentTime = (createdAt: number) => {
@@ -145,6 +146,47 @@ const handleCommentLike = (item: { id: number; likes: number; hasLiked?: boolean
 // 回复评论 - 发射事件给父组件处理
 const handleReply = (comment: CommentItem, toUser?: string) => {
   emit('reply-to', { rootId: comment.id, toUser })
+}
+
+const removeRootFromLists = (rootId: number) => {
+  const idxAll = allComments.value.findIndex((c) => c.id === rootId)
+  if (idxAll !== -1) {
+    allComments.value.splice(idxAll, 1)
+  }
+  const idxView = comments.value.findIndex((c) => c.id === rootId)
+  if (idxView !== -1) {
+    comments.value.splice(idxView, 1)
+    // 补齐当前页
+    if (comments.value.length < Math.min(COMMENTS_PAGE_SIZE, allComments.value.length)) {
+      const next = allComments.value.slice(comments.value.length, comments.value.length + 1)
+      comments.value.push(...next)
+    }
+    commentsHasMore.value = comments.value.length < allComments.value.length
+  }
+}
+
+const removeReplyFromLists = (rootId: number, replyId: number) => {
+  const root = allComments.value.find((c) => c.id === rootId)
+  if (!root) return
+  const idx = root.replies.findIndex((r) => r.id === replyId)
+  if (idx !== -1) root.replies.splice(idx, 1)
+}
+
+const handleDelete = async (rootId: number, commentId: number, isReply: boolean) => {
+  if (!isAdmin.value) return
+  if (!window.confirm('确定删除这条评论吗？')) return
+  try {
+    await deletePostComment(props.postId, commentId)
+    if (isReply) {
+      removeReplyFromLists(rootId, commentId)
+    } else {
+      removeRootFromLists(commentId)
+    }
+    emit('comment-count-change', totalCommentsCount.value)
+  } catch (e) {
+    console.error('删除评论失败:', e)
+    alert('删除失败，请重试')
+  }
 }
 
 // 添加新评论到列表（由父组件调用）
@@ -273,6 +315,13 @@ onMounted(() => {
             >
               回复
             </button>
+            <button
+              v-if="isAdmin"
+              @click="handleDelete(comment.id, comment.id, false)"
+              class="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium"
+            >
+              删除
+            </button>
           </div>
 
           <!-- 回复列表 -->
@@ -320,6 +369,13 @@ onMounted(() => {
                     class="text-[10px] text-gray-400 hover:text-blue-500 transition-colors"
                   >
                     回复
+                  </button>
+                  <button
+                    v-if="isAdmin"
+                    @click="handleDelete(comment.id, reply.id, true)"
+                    class="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    删除
                   </button>
                 </div>
               </div>

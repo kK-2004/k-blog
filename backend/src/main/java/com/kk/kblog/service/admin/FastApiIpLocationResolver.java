@@ -49,22 +49,22 @@ public class FastApiIpLocationResolver implements IpLocationResolver {
     @Override
     public String resolveLocation(String ip) {
         if (ip == null || ip.isBlank()) return "UNKNOWN";
-        if ("127.0.0.1".equals(ip) || "::1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip)) return "LOCAL";
+//        if ("127.0.0.1".equals(ip) || "::1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip)) return "LOCAL";
 
         try {
             var info = fetch(ip);
             var formatted = format(info);
-            System.out.println(formatted);
             if (formatted == null || formatted.isBlank() || "UNKNOWN".equalsIgnoreCase(formatted)) {
                 return fallback.resolveLocation(ip);
             }
             return formatted;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("[熔断降级]ip_fastapi_fetch_failed url={} ip={}", urlTemplate, ip);
             return fallback.resolveLocation(ip);
         }
     }
 
-    private @Nullable IpInfo fetch(String ip) throws IOException {
+    private @Nullable IpInfo fetch(String ip) {
         return restClient.get()
                 .uri(urlTemplate, Map.of("ip", ip))
                 .exchange((req, res) -> {

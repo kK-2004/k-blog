@@ -2,6 +2,8 @@ package com.kk.kblog.api;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -93,7 +95,7 @@ public class GlobalExceptionHandler {
         boolean isDev = Arrays.asList(env.getActiveProfiles()).contains("dev");
         log.error("Unhandled exception in controller", ex);
         String msg = isDev
-                ? ("服务器错误 [" + ex.getClass().getSimpleName() + ": " + String.valueOf(ex.getMessage()) + "]")
+                ? ("服务器错误 [" + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "]")
                 : "服务器错误";
         try {
             if (isDev && ex.getCause() != null) {
@@ -110,6 +112,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(com.kk.kblog.util.ratelimit.RateLimitedException.class)
     public ResponseEntity<ApiError> handleRateLimited(com.kk.kblog.util.ratelimit.RateLimitedException ex) {
         return new ResponseEntity<>(new ApiError(ex.getMessage()), HttpStatus.TOO_MANY_REQUESTS);
+    }
+    
+    @ExceptionHandler
+    public ResponseEntity<ApiError> handleEntityNotFoundException(EntityNotFoundException ex){
+        return new ResponseEntity<>(new ApiError("博客不存在"), HttpStatus.NOT_FOUND);
     }
 
     private String buildOssExtraIfPresent(Throwable cause) throws Exception {

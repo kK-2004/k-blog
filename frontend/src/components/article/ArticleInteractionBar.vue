@@ -184,21 +184,23 @@ defineExpose({
           <!-- 点赞按钮 -->
           <button
             @click="emit('like')"
-            class="flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all duration-200 shrink-0"
+            class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg transition-all duration-200 shrink-0 h-10"
             :class="
               hasLiked
                 ? 'text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'
             "
           >
-            <i :class="hasLiked ? 'ph-fill ph-heart' : 'ph ph-heart'" class="text-xl"></i>
-            <span class="text-sm font-medium">{{ likes }}</span>
+            <span class="inline-flex items-center justify-center w-5 h-5 shrink-0">
+              <i :class="hasLiked ? 'ph-fill ph-heart' : 'ph ph-heart'" class="text-xl absolute"></i>
+            </span>
+            <span class="text-sm font-medium leading-none">{{ likes }}</span>
           </button>
 
           <!-- 分享按钮 -->
           <button
             @click="handleShare"
-            class="p-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
+            class="p-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0 h-10"
             title="分享文章"
           >
             <i class="ph ph-share-network text-xl"></i>

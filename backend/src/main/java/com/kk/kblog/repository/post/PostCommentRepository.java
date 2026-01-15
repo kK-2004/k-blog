@@ -11,6 +11,8 @@ public interface PostCommentRepository extends JpaRepository<PostCommentEntity, 
 
     List<PostCommentEntity> findByPostIdAndParentIdInOrderByCreatedAtAscIdAsc(long postId, List<Long> parentIds);
 
+    List<PostCommentEntity> findByPostIdAndParentIdOrderByCreatedAtAscIdAsc(long postId, long parentId);
+
     Optional<PostCommentEntity> findByIdAndPostId(long id, long postId);
 
     Optional<PostCommentEntity> findTopByPostIdAndParentIdIsNullAndLikesGreaterThanOrderByLikesDescCreatedAtDescIdDesc(long postId, int likes);

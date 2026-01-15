@@ -18,6 +18,7 @@ app:
       enabled: true
       connect-timeout-ms: 800
       read-timeout-ms: 1200
+      url-template: "http://127.0.0.1:9000/resolve?ip={ip}"
   ai:
     summary_prompt: |
       你是 KKBlog 的 AI 助手，基于智谱 GLM-4-flash 模型。
