@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(git-commit-generator)",
+      "Bash(python3:*)",
+      "Skill(jenkins-deploy)"
+    ]
+  }
+}

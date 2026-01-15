@@ -43,7 +43,7 @@ RUN mvn -B -q -T 1C clean package \
     -DskipTests=${SKIP_TESTS} \
     -P${MAVEN_PROFILE} \
     -Dmaven.compiler.forceJavacCompilerUse=true \
-    -Dmaven.compiler.source=17 -Dmaven.compiler.target=17 \
+    -Dmaven.compiler.source=21 -Dmaven.compiler.target=21 \
     -Dmaven.compiler.parameters=true
 
 # 4) 处理产物（删除 original，复制主 jar 到根）
@@ -51,7 +51,7 @@ RUN find target -name "*-original.jar" -type f -delete && \
     cp $(ls -1 target/*.jar | head -n 1) /app.jar
 
 ## ==================== 第二阶段：运行时镜像 ====================
-FROM crpi-g3stl1c9yrlh5x39.cn-beijing.personal.cr.aliyuncs.com/kk09/openjdk:17-jdk
+FROM crpi-g3stl1c9yrlh5x39.cn-beijing.personal.cr.aliyuncs.com/kk09/openjdk:21-jdk
 
 LABEL authors="kk"
 ARG BUILD_NUMBER
