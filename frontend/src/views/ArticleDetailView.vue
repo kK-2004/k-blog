@@ -33,11 +33,21 @@ const error = ref(false)
 
 // 首次访问引导
 const showFirstVisitGuide = ref(false)
+const guideStep = ref<1 | 2>(1)
 const articleHeaderRef = ref<InstanceType<typeof ArticleHeader> | null>(null)
 
 const trafficLightRef = computed(() => {
   return articleHeaderRef.value?.trafficLightContainer || null
 })
+
+const nicknameInputRef = computed(() => {
+  return interactionBarRef.value?.nicknameInputRef || null
+})
+
+// 处理引导下一步
+const handleGuideNext = () => {
+  guideStep.value = 2
+}
 
 // 滚动和头部状态
 const { scrollProgress, activeHeadingId } = useScrollProgress()
@@ -181,7 +191,10 @@ watch(() => props.isSidebarOpen, async () => {
       <FirstVisitGuide
         v-if="showFirstVisitGuide"
         :targetRef="trafficLightRef"
+        :nicknameInputRef="nicknameInputRef"
         :isSidebarOpen="isSidebarOpen"
+        :step="guideStep"
+        @next="handleGuideNext"
         @close="showFirstVisitGuide = false"
       />
 

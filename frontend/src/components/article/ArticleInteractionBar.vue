@@ -24,6 +24,7 @@ const emit = defineEmits<{
 }>()
 
 // 输入框状态
+const nicknameInputRef = ref<HTMLElement | null>(null)
 const draftUser = ref('')
 const inputText = ref('')
 const replyingTo = ref<ReplyingTo | null>(null)
@@ -120,7 +121,8 @@ const handleShare = () => {
 
 // 暴露方法给父组件
 defineExpose({
-  setReplyingTo
+  setReplyingTo,
+  nicknameInputRef
 })
 </script>
 
@@ -154,6 +156,7 @@ defineExpose({
                 </button>
               </div>
               <input
+                ref="nicknameInputRef"
                 v-model="draftUser"
                 placeholder="Nickname..."
                 class="bg-transparent text-[10px] text-gray-500 dark:text-gray-400 px-3 py-1 outline-none w-full border-b border-gray-200 dark:border-white/5 mb-1 placeholder-gray-400/70"
