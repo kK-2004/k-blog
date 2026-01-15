@@ -20,13 +20,25 @@ logging:
   level:
     org.hibernate.SQL: warn
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    defaults:
+      enabled: true
+
 app:
   admin:
-    username: ${ADMIN_USERNAME:Admin}
+    username: ${ADMIN_USERNAME:kK}
     password: ${ADMIN_PASSWORD}
   ip:
     fastapi:
       enabled: true
-      url-template: ${IP_FASTAPI_URL_TEMPLATE}
       connect-timeout-ms: ${IP_FASTAPI_CONNECT_TIMEOUT_MS:800}
       read-timeout-ms: ${IP_FASTAPI_READ_TIMEOUT_MS:1200}
