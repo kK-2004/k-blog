@@ -71,7 +71,15 @@ public class AliOssPresignService {
         HashMap<String, String> headers = new HashMap<>();
         headers.put("x-oss-object-acl", "public-read");
         req.setHeaders(headers);
-        return client.generatePresignedUrl(req);
+
+        // 生成预签名 URL 后强制使用 HTTPS（避免混合内容错误）
+        var url = client.generatePresignedUrl(req);
+        try {
+            return new URL(url.toString().replaceFirst("^http://", "https://"));
+        } catch (java.net.MalformedURLException e) {
+            log.warn("Failed to convert presigned URL to HTTPS, using original", e);
+            return url;
+        }
     }
 
     public void deleteByKey(String objectKey) {

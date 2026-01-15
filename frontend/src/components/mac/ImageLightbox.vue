@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue'
+import { watch } from 'vue'
 
 const props = defineProps<{
   imageUrl: string

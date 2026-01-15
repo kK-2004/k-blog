@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Skill(git-commit-generator)"
+      "Skill(git-commit-generator)",
+      "Bash(python3:*)"
     ]
   }
 }
