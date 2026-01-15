@@ -834,7 +834,7 @@ const closeCollapseHint = () => {
 </script>
 
 <template>
-  <div ref="cardRef" class="mb-8 group/card transition-transform duration-300 hover:-translate-y-1">
+  <div ref="cardRef" class="mb-8 group/card transition-transform duration-300 hover:-translate-y-1 max-w-[490px]">
     <div
         class="bg-white/90 dark:bg-[#1e1e1e]/90 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 dark:border-white/10 overflow-hidden relative flex flex-col transition-[max-height] duration-[520ms] ease-[cubic-bezier(0.25,1,0.5,1)]"
         :style="{ maxHeight: isVisuallyExpanded ? `${EXPANDED_MAX_HEIGHT}px` : `${COLLAPSED_MAX_HEIGHT}px` }"

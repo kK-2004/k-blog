@@ -76,5 +76,18 @@ const headingClassMap = computed(() => {
 <style scoped>
 .article-toc {
   @apply max-w-xs;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.article-toc::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+.article-toc {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>
