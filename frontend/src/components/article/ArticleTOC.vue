@@ -27,8 +27,9 @@ const tocOriginalOffsetTop = ref(0) // 记录目录的初始位置
 
 // 当前激活标题的文字
 const currentHeadingText = computed(() => {
+  if (props.headings.length === 0) return '暂无目录'
   const active = props.headings.find(h => h.id === props.activeId)
-  return active?.text || '暂无目录'
+  return active?.text || props.headings[0]?.text || '目录'
 })
 
 // 计算固定时的top值（header高度）

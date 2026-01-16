@@ -353,4 +353,13 @@ watch(() => props.isSidebarOpen, async () => {
 :deep(.prose h3[id]) {
   scroll-margin-top: 140px;
 }
+
+/* 移动端滚动容器优化 - 防止 iOS 橡皮筋效果和横向拖动 */
+@media (max-width: 1024px) {
+  article.overflow-y-auto {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
 </style>
