@@ -69,7 +69,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 移动端文章列表 -->
-    <div class="lg:hidden px-4 pb-8">
+    <div class="lg:hidden px-0 pb-8">
       <MacBlogCard
           v-for="post in posts"
           :key="post.id"

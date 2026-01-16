@@ -224,15 +224,15 @@ watch(() => props.isSidebarOpen, async () => {
       <!-- 固定视口容器：左侧滚动，右侧固定 -->
       <main class="fixed inset-0 pt-8 h-[calc(100dvh-2rem)] overflow-hidden z-10 transition-all duration-300"
             :class="isSidebarOpen ? 'left-64' : 'left-0'">
-        <div class="h-full w-full px-4 sm:px-6">
+        <div class="h-full w-full px-3 sm:px-4 md:px-6">
           <div class="flex h-full gap-6 2xl:gap-8">
 
             <!-- 左侧：正文滚动区域 -->
             <article class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
-              <div class="max-w-[110rem] mx-auto py-6 pb-64">
+              <div class="w-full max-w-3xl lg:max-w-4xl mx-auto py-6 pb-64">
 
                 <!-- 文章卡片 -->
-                <div class="pl-20 rounded-xl border border-gray-200/60 dark:border-gray-800/60 overflow-hidden">
+                <div class="pl-0 lg:pl-20 rounded-xl border border-gray-200/60 dark:border-gray-800/60 overflow-hidden mb-6">
                   <div class="p-8 md:p-12 lg:p-14">
 
                     <ArticleMeta
@@ -243,26 +243,41 @@ watch(() => props.isSidebarOpen, async () => {
                         :views="post.views"
                         :tags="[]"
                         :authorAvatarUrl="authorAvatarUrl"
-                        class="mb-8"
+                        class="mb-0"
                     />
 
-                    <AiSummaryCard
-                        :postId="post.id"
+                  </div>
+                </div>
+
+                <!-- 移动端目录 - 在文章信息栏下方，使用 sticky 定位 -->
+                <div class="lg:hidden">
+                  <ArticleTOC
+                      :headings="headings"
+                      :activeId="activeHeadingId"
+                  />
+                </div>
+
+                <!-- AI 摘要卡片 -->
+                <div class="pl-0 lg:pl-20">
+                  <AiSummaryCard
+                      :postId="post.id"
+                      :content="post.content"
+                      class="mb-12"
+                  />
+                </div>
+
+                <!-- 文章内容 -->
+                <div class="pl-0 lg:pl-20">
+                  <div class="article-body">
+                    <ArticleContent
                         :content="post.content"
-                        class="mb-12"
+                        @headings="handleHeadingsUpdate"
                     />
-
-                    <div class="article-body">
-                      <ArticleContent
-                          :content="post.content"
-                          @headings="handleHeadingsUpdate"
-                      />
-                    </div>
                   </div>
                 </div>
 
                 <!-- 评论区域 -->
-                <section id="comments-section" class="mt-8 rounded-xl border border-gray-200/60 dark:border-gray-800/60 p-6 md:p-8">
+                <section id="comments-section" class="mt-8 rounded-xl border border-gray-200/60 dark:border-gray-800/60 p-3 sm:p-4 md:p-6 lg:p-8">
                   <CommentSection
                       ref="commentSectionRef"
                       :postId="post.id"
@@ -278,7 +293,7 @@ watch(() => props.isSidebarOpen, async () => {
 
             <!-- 右侧：目录固定 -->
             <aside class="hidden xl:block 2xl:w-48 shrink-0 py-6">
-              <div class="sticky top-0 pt-8 md:pt-10 lg:pt-12">
+              <div class="sticky top-0 pt-8 md:pt-10 lg:pt-12 lg:pb-20">
                 <ArticleTOC
                     :headings="headings"
                     :activeId="activeHeadingId"
@@ -329,14 +344,6 @@ watch(() => props.isSidebarOpen, async () => {
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   opacity: 1;
   background-color: rgba(156, 163, 175, 0.4);
-}
-
-/* 解决正文标题重复问题：
-  如果 ArticleContent 渲染的 Markdown 里包含 h1，
-  这里将其强制隐藏（因为我们在上面已经手动渲染了 H1）
-*/
-:deep(.article-body h1) {
-  display: none;
 }
 
 /* 标题锚点偏移

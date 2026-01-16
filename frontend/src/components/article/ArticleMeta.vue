@@ -30,7 +30,7 @@ const formattedDate = computed(() => {
 </script>
 
 <template>
-  <div class="article-meta mb-10">
+  <div class="article-meta">
     <!-- 作者信息 -->
     <div class="flex items-center gap-3 mb-3">
       <img

@@ -26,7 +26,7 @@ const filteredMenuItems = computed(() => {
 
 <template>
   <aside
-    class="fixed top-8 left-0 z-30 h-[calc(100vh-2rem)] w-64 bg-white/80 dark:bg-[#1e1e1e]/90 backdrop-blur-2xl border-r border-white/20 dark:border-white/5 shadow-2xl transition-transform duration-300 ease-out"
+    class="fixed top-8 left-0 z-30 h-[calc(100vh-2rem)] w-64 bg-white/80 dark:bg-[#1e1e1e]/90 backdrop-blur-2xl border-r border-white/20 dark:border-white/5 transition-transform duration-300 ease-out"
     :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
   >
     <div class="p-4 space-y-1 mt-4">

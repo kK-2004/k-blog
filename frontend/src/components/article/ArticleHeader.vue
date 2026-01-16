@@ -32,6 +32,7 @@ defineExpose({
 <template>
   <Teleport to="body" v-if="isMounted">
     <header
+      data-article-header
       class="fixed w-full z-40 transition-all duration-300 border-b border-transparent"
       :class="[
         /* top-16 (64px): 为了避开顶部的 'KK Blog' 全局导航栏 */

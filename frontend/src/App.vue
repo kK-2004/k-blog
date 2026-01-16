@@ -106,8 +106,6 @@ onMounted(async () => {
       class="h-screen bg-[#f5f5f7] dark:bg-black font-sans text-[#1d1d1f] dark:text-[#f5f5f7] pt-8 transition-colors duration-500 overflow-hidden relative"
       :style="bgStyle"
     >
-      <div class="absolute inset-0 bg-white/30 dark:bg-black/40 pointer-events-none"></div>
-
       <MacNavBar
         :timeStr="timeStr"
         :theme="theme"

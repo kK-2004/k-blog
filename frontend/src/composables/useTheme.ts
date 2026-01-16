@@ -52,7 +52,7 @@ export function useTheme() {
       backgroundColor: theme.value === 'light' ? '#ffffff' : '#000000',
       backgroundImage: dotPattern,
       backgroundSize: '24px 24px',
-      backgroundPosition: '0 0, 12px 12px',
+      backgroundPosition: 'center',
       backgroundAttachment: 'fixed',
     } as const
   })

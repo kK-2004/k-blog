@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue'
 import { createPostComment, createPostCommentReply } from '@/api/comments'
+import { useMessage } from '@/composables/useMessage'
 
 interface ReplyingTo {
   rootId: number
@@ -22,6 +23,8 @@ const emit = defineEmits<{
   (e: 'share'): void
   (e: 'comment-submitted', data: { id: number; user: string; text: string; rootId?: number; toUser?: string }): void
 }>()
+
+const { success } = useMessage()
 
 // 输入框状态
 const nicknameInputRef = ref<HTMLElement | null>(null)
@@ -107,14 +110,15 @@ const handleSubmit = async () => {
   }
 }
 
-const handleShare = () => {
+const handleShare = async () => {
   // 复制当前页面 URL
   const url = window.location.href
-  navigator.clipboard.writeText(url).then(() => {
-    alert('链接已复制到剪贴板')
-  }).catch(() => {
-    alert('复制失败，请手动复制链接')
-  })
+  try {
+    await navigator.clipboard.writeText(url)
+    success('链接已复制到剪贴板')
+  } catch {
+    success('复制失败，请手动复制链接')
+  }
 
   emit('share')
 }
