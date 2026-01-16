@@ -63,22 +63,42 @@ const handleScroll = () => {
 
 // 组件挂载时初始化
 onMounted(() => {
-  const scrollContainer = document.querySelector('article.overflow-y-auto')
-  if (scrollContainer && mobileTocBarRef.value) {
-    // 记录目录的初始位置（相对于滚动容器）
-    const containerRect = scrollContainer.getBoundingClientRect()
-    const tocRect = mobileTocBarRef.value.getBoundingClientRect()
-    const scrollTop = (scrollContainer as HTMLElement).scrollTop
+  const initTocTracking = (retryCount = 0) => {
+    const scrollContainer = document.querySelector('article.overflow-y-auto') as HTMLElement | null
+    const headerEl = document.querySelector('[data-article-header]')
 
-    // 计算目录在文档中的位置
-    tocOriginalOffsetTop.value = tocRect.top - containerRect.top + scrollTop
+    if (scrollContainer && mobileTocBarRef.value && headerEl) {
+      // 检查是否有标题元素（确保文章内容已渲染）
+      const headings = document.querySelectorAll('.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6')
+      if (headings.length === 0 && retryCount < 20) {
+        // 标题还没渲染，继续等待
+        setTimeout(() => initTocTracking(retryCount + 1), 100)
+        return
+      }
 
-    // 添加滚动监听
-    scrollContainer.addEventListener('scroll', handleScroll)
+      // 记录目录的初始位置（相对于滚动容器）
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const tocRect = mobileTocBarRef.value.getBoundingClientRect()
+      const scrollTop = scrollContainer.scrollTop
 
-    // 初始检查一次位置
-    handleScroll()
+      // 计算目录在文档中的位置
+      tocOriginalOffsetTop.value = tocRect.top - containerRect.top + scrollTop
+
+      // 添加滚动监听
+      scrollContainer.addEventListener('scroll', handleScroll)
+
+      // 初始检查一次位置
+      handleScroll()
+      return
+    }
+
+    // 重试：最多重试 20 次，每次间隔 100ms（总共 2 秒）
+    if (retryCount < 20) {
+      setTimeout(() => initTocTracking(retryCount + 1), 100)
+    }
   }
+
+  initTocTracking()
 })
 
 // 组件卸载时清理
@@ -93,8 +113,15 @@ const scrollToHeading = (id: string) => {
   const el = document.getElementById(id)
   const scrollContainer = document.querySelector('article.overflow-y-auto')
 
-  if (el && scrollContainer) {
-    const containerEl = scrollContainer as HTMLElement
+  if (!el || !scrollContainer) {
+    console.warn('[TOC] Cannot scroll: element or container not found', { id, hasEl: !!el, hasContainer: !!scrollContainer })
+    return
+  }
+
+  const containerEl = scrollContainer as HTMLElement
+
+  // 使用 requestAnimationFrame 确保布局稳定后再计算位置
+  requestAnimationFrame(() => {
     const containerRect = containerEl.getBoundingClientRect()
     const targetTop = el.getBoundingClientRect().top - containerRect.top + containerEl.scrollTop
 
@@ -114,7 +141,7 @@ const scrollToHeading = (id: string) => {
     emit('navigate', id)
     // 移动端点击后自动折叠目录
     isMobileExpanded.value = false
-  }
+  })
 }
 
 // 桌面端目录样式

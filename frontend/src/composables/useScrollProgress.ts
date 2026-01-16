@@ -60,17 +60,33 @@ export function useScrollProgress() {
   }
 
   onMounted(() => {
-    setTimeout(() => {
+    const initScrollTracking = (retryCount = 0) => {
       scrollContainer = document.querySelector('article.overflow-y-auto') as HTMLElement
       headingsElements = document.querySelectorAll('.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6')
-      
-      if (scrollContainer) {
-        scrollContainer.addEventListener('scroll', throttledHandleScroll, { passive: true })
+
+      // 如果找到容器或有标题元素，初始化成功
+      if (scrollContainer || headingsElements?.length) {
+        if (scrollContainer) {
+          scrollContainer.addEventListener('scroll', throttledHandleScroll, { passive: true })
+        } else {
+          window.addEventListener('scroll', throttledHandleScroll, { passive: true })
+        }
+        handleScroll()
+        return
+      }
+
+      // 重试：最多重试 20 次，每次间隔 100ms（总共 2 秒）
+      // 解决服务器网络慢时文章还未渲染的问题
+      if (retryCount < 20) {
+        setTimeout(() => initScrollTracking(retryCount + 1), 100)
       } else {
+        // 最后 fallback 到 window
         window.addEventListener('scroll', throttledHandleScroll, { passive: true })
       }
-      handleScroll()
-    }, 100)
+    }
+
+    // 首次尝试
+    initScrollTracking()
   })
 
   onUnmounted(() => {
