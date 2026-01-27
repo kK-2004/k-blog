@@ -5,10 +5,13 @@ import { useTheme } from '@/composables/useTheme'
 import { useHashRouter } from '@/composables/useHashRouter'
 import { listPosts } from '@/api/posts'
 import { logout as apiLogout, me as apiMe } from '@/api/admin'
-import { getPublicProfile } from '@/api/site'
+import { getPublicProfile, type PublicProfile } from '@/api/site'
 import type { AdminMe, Post } from '@/api/types'
 import MacNavBar from '@/components/mac/MacNavBar.vue'
 import MacSidebar from '@/components/mac/MacSidebar.vue'
+import ProfileOverview from '@/components/mac/ProfileOverview.vue'
+import HotPostsList from '@/components/mac/HotPostsList.vue'
+import MobileSideDrawer from '@/components/mac/MobileSideDrawer.vue'
 import AdminView from '@/views/AdminView.vue'
 import BlogView from '@/views/BlogView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -21,11 +24,17 @@ const { currentView, navigateTo, articleId } = useHashRouter()
 
 const isSidebarOpen = ref(false)
 const mainRef = ref<HTMLElement | null>(null)
+const mainRefMobile = ref<HTMLElement | null>(null)
 const posts = ref<Post[]>([])
 const isAuthenticated = ref(false)
 const adminMe = ref<AdminMe | null>(null)
 const authReady = ref(false)
+// 存储完整的公开 profile 数据，避免子组件重复请求
+const publicProfile = ref<PublicProfile | null>(null)
 const authorAvatarUrl = ref<string | null>(null)
+// 移动端抽屉状态
+const isMobileDrawerOpen = ref(false)
+const drawerTab = ref<'profile' | 'hotposts'>('profile')
 
 const refreshPosts = async () => {
   posts.value = await listPosts()
@@ -34,8 +43,10 @@ const refreshPosts = async () => {
 const loadPublicProfile = async () => {
   try {
     const profile = await getPublicProfile()
+    publicProfile.value = profile
     authorAvatarUrl.value = profile.avatarUrl
   } catch {
+    publicProfile.value = null
     authorAvatarUrl.value = null
   }
 }
@@ -84,6 +95,19 @@ const onAvatarClick = () => {
   }
 }
 
+// 移动端抽屉方法
+const toggleMobileDrawer = () => {
+  isMobileDrawerOpen.value = !isMobileDrawerOpen.value
+}
+
+const closeMobileDrawer = () => {
+  isMobileDrawerOpen.value = false
+}
+
+const switchDrawerTab = (tab: 'profile' | 'hotposts') => {
+  drawerTab.value = tab
+}
+
 // 路由守卫：未登录不能访问 admin 和 settings
 watch(currentView, (newView) => {
   if (!authReady.value) return
@@ -112,6 +136,7 @@ onMounted(async () => {
         :isAuthenticated="isAuthenticated"
         @toggle-theme="toggleTheme"
         @toggle-sidebar="isSidebarOpen = !isSidebarOpen"
+        @toggle-mobile-drawer="toggleMobileDrawer"
         @avatar-click="onAvatarClick"
         @logout="logout"
       />
@@ -122,11 +147,70 @@ onMounted(async () => {
         :isAuthenticated="isAuthenticated"
       />
 
-      <main
+      <!-- 桌面端固定侧边栏：左侧 Profile -->
+      <aside v-show="currentView === 'blog'" class="hidden lg:block fixed left-12 top-12 z-20 w-[360px] h-[calc(100vh-2rem)] pointer-events-none">
+        <div class="sticky top-0 p-4 pointer-events-auto">
+          <ProfileOverview
+            :show-full-features="false"
+            :is-authenticated="isAuthenticated"
+            :public-profile="publicProfile"
+          />
+        </div>
+      </aside>
+
+      <!-- 桌面端固定侧边栏：右侧 HotPosts -->
+      <aside v-show="currentView === 'blog'" class="hidden lg:block fixed right-12 top-12 z-20 w-[280px] h-[calc(100vh-2rem)] pointer-events-none">
+        <div class="sticky top-0 p-4 pointer-events-auto">
+          <HotPostsList />
+        </div>
+      </aside>
+
+      <!-- 主内容区域 -->
+      <!-- 外层容器：可滚动，侧边栏区域 pointer-events-none -->
+      <div
         ref="mainRef"
-        class="relative z-10 max-w-4xl mx-auto p-6 mt-6 h-[calc(100vh-8rem)] overflow-y-auto mac-scrollbar transition-transform duration-300 ease-out"
+        class="hidden lg:block fixed left-0 right-0 top-8 h-[calc(100vh-2rem)] overflow-y-auto scrollbar-hide"
+      >
+        <div class="mx-auto max-w-[1600px] px-4 flex justify-center min-h-full">
+          <!-- 左侧预留空间（不拦截事件） -->
+          <div class="w-[240px] shrink-0 pointer-events-none"></div>
+          <!-- 中间内容 -->
+          <div class="flex-1 max-w-5xl px-4">
+            <main
+              class="transition-transform duration-300 ease-out relative z-10 py-4"
+              :class="[
+                // 侧边栏位移
+                isSidebarOpen ? 'translate-x-0' : 'translate-x-0'
+              ]"
+            >
+              <BlogView
+                v-if="currentView === 'blog'"
+                :isAuthenticated="isAuthenticated"
+                :adminMe="adminMe"
+                :authorAvatarUrl="authorAvatarUrl"
+                :scrollContainer="mainRef"
+              />
+              <LoginView v-else-if="currentView === 'login'" @login-success="onLoginSuccess" />
+              <AdminView
+                v-else-if="currentView === 'admin'"
+                :posts="posts"
+                @update:posts="setPosts"
+                @refresh="refreshPosts"
+              />
+              <SettingsView v-else-if="currentView === 'settings'" />
+            </main>
+          </div>
+          <!-- 右侧预留空间（不拦截事件） -->
+          <div class="w-[280px] shrink-0 pointer-events-none"></div>
+        </div>
+      </div>
+
+      <!-- 移动端主内容区域 -->
+      <main
+        ref="mainRefMobile"
+        class="lg:hidden scrollbar-hide transition-transform duration-300 ease-out relative z-10 h-[calc(100vh-8rem)] overflow-y-auto px-4 py-6"
         :class="[
-          isSidebarOpen ? 'translate-x-32' : 'translate-x-0'
+          isSidebarOpen ? 'translate-x-64' : 'translate-x-0'
         ]"
       >
         <BlogView
@@ -134,7 +218,7 @@ onMounted(async () => {
           :isAuthenticated="isAuthenticated"
           :adminMe="adminMe"
           :authorAvatarUrl="authorAvatarUrl"
-          :scrollContainer="mainRef"
+          :scrollContainer="mainRefMobile"
         />
         <LoginView v-else-if="currentView === 'login'" @login-success="onLoginSuccess" />
         <AdminView
@@ -145,6 +229,17 @@ onMounted(async () => {
         />
         <SettingsView v-else-if="currentView === 'settings'" />
       </main>
+
+      <!-- 移动端抽屉 -->
+      <MobileSideDrawer
+        :is-open="isMobileDrawerOpen"
+        :active-tab="drawerTab"
+        :is-authenticated="isAuthenticated"
+        :public-profile="publicProfile"
+        :current-view="currentView"
+        @close="closeMobileDrawer"
+        @switch-tab="switchDrawerTab"
+      />
 
       <!-- ArticleDetailView 单独渲染，不受 main 容器宽度限制 -->
       <ArticleDetailView

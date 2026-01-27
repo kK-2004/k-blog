@@ -156,6 +156,8 @@ const handleCommentSubmitted = (data: {
 }) => {
   // 调用 CommentSection 的 addComment 方法添加到列表
   commentSectionRef.value?.addComment(data)
+  // 滚动到评论区
+  nextTick(() => scrollToComment())
 }
 
 // 组件挂载时获取数据
@@ -219,6 +221,7 @@ watch(() => props.isSidebarOpen, async () => {
         :step="guideStep"
         @next="handleGuideNext"
         @close="showFirstVisitGuide = false"
+        class="hidden lg:block z-[9999]"
       />
 
       <!-- 固定视口容器：左侧滚动，右侧固定 -->
@@ -320,6 +323,7 @@ watch(() => props.isSidebarOpen, async () => {
             @comment="scrollToComment"
             @share="() => {}"
             @comment-submitted="handleCommentSubmitted"
+            class="z-[10]"
         />
       </Teleport>
 

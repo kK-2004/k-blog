@@ -1,13 +1,16 @@
 package com.kk.kblog.controller.post;
 
+import com.kk.kblog.dto.post.HotPostDto;
 import com.kk.kblog.dto.post.PostDto;
 import com.kk.kblog.dto.post.PostRequests.CreatePostRequest;
 import com.kk.kblog.dto.post.PostRequests.PatchPostRequest;
 import com.kk.kblog.dto.post.PostRequests.UpdatePostRequest;
+import com.kk.kblog.service.HotPostsService;
 import com.kk.kblog.service.post.PostService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PostController {
 
     private final PostService postService;
+    private final HotPostsService hotPostsService;
 
-    public PostController(PostService postService) {
+    public PostController(PostService postService, HotPostsService hotPostsService) {
         this.postService = postService;
+        this.hotPostsService = hotPostsService;
     }
 
     @GetMapping
@@ -42,6 +47,8 @@ public class PostController {
 
     @GetMapping("/{id}")
     public PostDto get(@PathVariable long id) {
+        // 异步记录文章访问（不阻塞响应）
+        CompletableFuture.runAsync(() -> hotPostsService.recordPostView(id));
         return postService.getPost(id);
     }
 
@@ -80,5 +87,14 @@ public class PostController {
     @PostMapping("/{id}/comments/increment")
     public PostDto incrementCommentsLegacy(@PathVariable long id) {
         return postService.incrementComments(id);
+    }
+
+    /**
+     * 获取热门文章榜单
+     * 返回最近时间窗口内访问过的文章，按最近访问时间排序
+     */
+    @GetMapping("/hot")
+    public List<HotPostDto> getHotPosts() {
+        return hotPostsService.getHotPosts();
     }
 }

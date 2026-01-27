@@ -15,7 +15,8 @@ export type PublicProfile = {
 }
 
 export async function getPublicProfile(): Promise<PublicProfile> {
-  return apiFetch<PublicProfile>('/api/site/profile')
+  // 缓存 60 秒，公开资料信息变化不频繁
+  return apiFetch<PublicProfile>('/api/site/profile', {}, { cacheMaxAge: 60000 })
 }
 
 export async function listMenuItems(): Promise<MenuItem[]> {
@@ -47,7 +48,8 @@ export async function listBlogQuickActions(): Promise<QuickAction[]> {
 }
 
 export async function listVisibleBlogQuickActions(): Promise<QuickAction[]> {
-  return apiFetch<QuickAction[]>('/api/site/blog-quick-actions/visible')
+  // 缓存 60 秒，快捷操作配置变化不频繁
+  return apiFetch<QuickAction[]>('/api/site/blog-quick-actions/visible', {}, { cacheMaxAge: 60000 })
 }
 
 export async function saveBlogQuickActions(items: QuickAction[]): Promise<QuickAction[]> {

@@ -65,7 +65,7 @@ const updatePosition = () => {
   // 步骤1：箭头从引导框底部指向目标顶部；步骤2：箭头从引导框底部指向目标顶部
   arrowTipPosition.value = {
     x: targetCenterX,
-    y: props.step === 1 ? targetRect.bottom + 10 : targetRect.top - 10
+    y: props.step === 1 ? targetRect.bottom + 10 : targetRect.top - 20
   }
 
   // 步骤1：引导框在目标下方，箭头向下；步骤2：引导框在目标上方，箭头向上

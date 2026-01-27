@@ -11,6 +11,7 @@ const props = defineProps<{
 
 defineEmits<{
   (e: 'toggle-sidebar'): void
+  (e: 'toggle-mobile-drawer'): void
   (e: 'avatar-click'): void
   (e: 'toggle-theme'): void
   (e: 'logout'): void
@@ -44,6 +45,14 @@ const handleImageLoad = () => {
     <div class="flex items-center gap-4 h-full">
       <button class="hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded transition-colors" @click="$emit('toggle-sidebar')">
         <i class="ph ph-sidebar text-lg"></i>
+      </button>
+      <!-- 移动端抽屉按钮 -->
+      <button
+        class="lg:hidden hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded transition-colors"
+        @click="$emit('toggle-mobile-drawer')"
+        title="个人信息和热门文章"
+      >
+        <i class="ph ph-layout text-lg"></i>
       </button>
       <div class="flex items-center gap-3">
         <button class="relative group cursor-pointer" @click="$emit('avatar-click')">

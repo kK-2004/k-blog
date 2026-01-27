@@ -300,7 +300,7 @@ onMounted(() => {
           </p>
 
           <!-- 操作按钮 -->
-          <div class="flex items-center gap-4 opacity-0 group-hover/comment:opacity-100 transition-opacity">
+          <div class="flex items-center gap-4">
             <button
               @click="handleCommentLike(comment)"
               class="flex items-center gap-1 text-xs transition-colors"

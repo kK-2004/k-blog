@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import '@phosphor-icons/web/regular'
+import '@fortawesome/fontawesome-free/css/all.min.css'
 import './style.css'
 // Markdown 代码块自定义样式
 import './assets/styles/markdown-code-block.css'

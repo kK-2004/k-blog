@@ -1,5 +1,5 @@
 import { apiFetch } from './http'
-import type { Post } from './types'
+import type { HotPost, Post } from './types'
 
 export type CreatePostRequest = {
   title: string
@@ -42,4 +42,8 @@ export async function incrementLikes(id: number): Promise<Post> {
 
 export async function incrementComments(id: number): Promise<Post> {
   return apiFetch<Post>(`/api/posts/${id}/comments/increment`, { method: 'POST' })
+}
+
+export async function getHotPosts(): Promise<HotPost[]> {
+  return apiFetch<HotPost[]>('/api/posts/hot', {}, { cache: true, cacheMaxAge: 30000 })
 }

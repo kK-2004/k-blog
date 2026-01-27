@@ -30,6 +30,12 @@ export type Post = {
   pinned: boolean
 }
 
+export type HotPost = {
+  id: number
+  title: string
+  lastViewTime: number
+}
+
 export type MenuItem = {
   id: string
   label: string

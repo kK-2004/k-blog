@@ -5,27 +5,41 @@ import { usePublicProfile } from '@/composables/usePublicProfile'
 import { useUserAvatar } from '@/composables/useUserAvatar'
 import { listVisibleBlogQuickActions } from '@/api/site'
 import type { QuickAction } from '@/api/types'
+import type { PublicProfile } from '@/api/site'
+
 
 const props = defineProps<{
   showFullFeatures?: boolean
   isAuthenticated?: boolean
+  /** 外部传入的公开资料，如果提供则不重新请求 */
+  publicProfile?: PublicProfile | null
 }>()
 
 // 根据登录状态选择使用哪个 composable
 const userProfile = useUserProfile()
-const publicProfile = usePublicProfile()
+const publicProfileComposable = usePublicProfile()
 
 // 动态选择 profile 数据源
+// 如果外部传入了 publicProfile，使用外部传入的；否则使用 composable 的数据
 const profile = computed(() => {
-  return props.isAuthenticated ? userProfile.profile.value : publicProfile.profile.value
+  if (props.isAuthenticated) {
+    return userProfile.profile.value
+  }
+  // 未登录时，优先使用外部传入的 publicProfile，否则使用 composable 的数据
+  return props.publicProfile || publicProfileComposable.profile.value
 })
 
 // 动态选择加载方法
+// 如果外部已传入 publicProfile 且未登录，则无需重新加载
 const loadProfile = async () => {
   if (props.isAuthenticated) {
     return await userProfile.loadProfile()
   } else {
-    return await publicProfile.loadProfile()
+    // 如果外部已经传入了 publicProfile，不需要重新加载
+    if (props.publicProfile) {
+      return true
+    }
+    return await publicProfileComposable.loadProfile()
   }
 }
 
@@ -42,7 +56,11 @@ const isFieldFilled = (field: string) => {
   if (props.isAuthenticated) {
     return userProfile.isFieldFilled(field as any)
   }
-  return publicProfile.isFieldFilled(field as any)
+  // 未登录时，优先使用外部传入的 publicProfile
+  const profileData = props.publicProfile || publicProfileComposable.profile.value
+  if (!profileData) return false
+  const value = profileData[field as keyof PublicProfile]
+  return value !== null && value !== undefined && value !== ''
 }
 
 // 登录用户使用 useUserAvatar，未登录用户从 publicProfile 获取头像
@@ -51,7 +69,8 @@ const avatarUrl = computed(() => {
   if (props.isAuthenticated) {
     return userAvatarUrl.value
   }
-  return publicProfile.profile.value?.avatarUrl || null
+  // 未登录时，优先使用外部传入的 publicProfile 的头像
+  return (props.publicProfile || publicProfileComposable.profile.value)?.avatarUrl || null
 })
 
 const isHovering = ref(false)
@@ -164,8 +183,7 @@ const getGenderIcon = (gender: string | null) => {
             v-if="isFieldFilled('qq') && isFieldVisible('qq')"
             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
-          <i class="ph ph-qq-logo text-cyan-500 dark:text-cyan-400"></i>
-          <span class="text-sm text-gray-500 dark:text-gray-400">QQ:</span>
+          <i class="fa-brands fa-qq text-cyan-500 dark:text-cyan-400"></i>
           <span class="text-sm text-gray-700 dark:text-gray-300">{{ profile.qq }}</span>
         </div>
 
@@ -175,7 +193,6 @@ const getGenderIcon = (gender: string | null) => {
             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
           <i class="ph ph-wechat-logo text-emerald-500 dark:text-emerald-400"></i>
-          <span class="text-sm text-gray-500 dark:text-gray-400">微信:</span>
           <span class="text-sm text-gray-700 dark:text-gray-300">{{ profile.wechat }}</span>
         </div>
 
@@ -185,7 +202,6 @@ const getGenderIcon = (gender: string | null) => {
             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
           <i class="ph ph-envelope text-purple-500 dark:text-purple-400"></i>
-          <span class="text-sm text-gray-500 dark:text-gray-400">邮箱:</span>
           <span class="text-sm text-gray-700 dark:text-gray-300 truncate">{{ profile.email }}</span>
         </div>
 

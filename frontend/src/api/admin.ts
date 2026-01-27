@@ -33,7 +33,8 @@ export async function logout(): Promise<void> {
 }
 
 export async function me(): Promise<AdminMe> {
-  return apiFetch<AdminMe>('/api/admin/me')
+  // 缓存 30 秒，登录状态信息变化不频繁
+  return apiFetch<AdminMe>('/api/admin/me', {}, { cacheMaxAge: 30000 })
 }
 
 export type UpdateAdminProfileRequest = {

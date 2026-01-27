@@ -47,6 +47,7 @@ const props = defineProps<{
   isAuthenticated: boolean
   adminMe: AdminMe | null
   authorAvatarUrl: string | null
+  scrollContainer?: HTMLElement | null
 }>()
 
 const COLLAPSED_MAX_HEIGHT = 600
@@ -401,8 +402,15 @@ const getCardTargetScrollY = () => {
   const rect = el.getBoundingClientRect()
   const viewportCenterY = headerHeight + (window.innerHeight - headerHeight) / 2
   const elementCenterY = rect.top + rect.height / 2
-  const targetY = window.scrollY + (elementCenterY - viewportCenterY)
-  const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+
+  // 使用 scrollContainer.scrollTop 或 window.scrollY
+  const currentScroll = props.scrollContainer?.scrollTop ?? window.scrollY
+  const targetY = currentScroll + (elementCenterY - viewportCenterY)
+
+  // 计算最大滚动值
+  const scrollContainer = props.scrollContainer ?? document.documentElement
+  const maxScrollY = Math.max(0, scrollContainer.scrollHeight - window.innerHeight)
+
   return Math.min(maxScrollY, Math.max(0, targetY))
 }
 
@@ -435,14 +443,27 @@ const scrollCardToCenter = async (opts?: { durationMs?: number }) => {
     const target = getCardTargetScrollY()
     if (target == null) return stopCenterScroll()
 
-    const current = window.scrollY
+    // 获取当前滚动位置
+    const scrollContainer = props.scrollContainer
+    const current = scrollContainer?.scrollTop ?? window.scrollY
+
     const remaining = Math.max(0, centerScrollStopAt - now)
     const alpha = remaining < 120 ? 0.28 : 0.18
     const next = current + (target - current) * alpha
-    window.scrollTo({ top: next, behavior: 'auto' })
+
+    // 使用正确的滚动容器
+    if (scrollContainer) {
+      scrollContainer.scrollTop = next
+    } else {
+      window.scrollTo({ top: next, behavior: 'auto' })
+    }
 
     if (now >= centerScrollStopAt || Math.abs(target - next) < 0.5) {
-      window.scrollTo({ top: target, behavior: 'auto' })
+      if (scrollContainer) {
+        scrollContainer.scrollTop = target
+      } else {
+        window.scrollTo({ top: target, behavior: 'auto' })
+      }
       return stopCenterScroll()
     }
     centerScrollRaf = window.requestAnimationFrame(tick)
@@ -492,7 +513,8 @@ const expand = () => {
     if (centerScrollUserInterrupted) return
     const target = getCardTargetScrollY()
     if (target == null) return
-    if (Math.abs(window.scrollY - target) <= 2) return
+    const current = props.scrollContainer?.scrollTop ?? window.scrollY
+    if (Math.abs(current - target) <= 2) return
     void scrollCardToCenter({ durationMs: 180 })
   }, EXPAND_COLLAPSE_MS + 80)
 
@@ -918,16 +940,6 @@ const closeCollapseHint = () => {
                 <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ post.author }}</div>
                 <div class="text-xs text-gray-400 font-mono">{{ displayPostTime }}</div>
               </div>
-
-              <!-- 全屏阅读按钮（仅在展开状态显示） -->
-              <button
-                v-if="isExpanded"
-                @click="navigateToArticle"
-                class="px-3 py-1.5 text-xs font-medium bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg hover:border-blue-400 dark:hover:border-blue-500/50 hover:text-blue-600 dark:hover:text-blue-400 transition-all flex items-center gap-1.5 shadow-sm"
-              >
-                <i class="ph ph-arrows-out-simple"></i>
-                <span>全屏阅读</span>
-              </button>
             </div>
 
             <div
@@ -1222,6 +1234,16 @@ const closeCollapseHint = () => {
             </div>
           </div>
         </div>
+
+        <!-- 全屏阅读按钮（展开时显示在右上角） -->
+        <button
+          v-if="isExpanded"
+          @click="navigateToArticle"
+          class="absolute top-6 right-6 px-3 py-1.5 text-xs font-medium bg-white/95 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-lg hover:border-blue-400 dark:hover:border-blue-500/50 hover:text-blue-600 dark:hover:text-blue-400 transition-all flex items-center gap-1.5 shadow-sm z-30 backdrop-blur-sm"
+        >
+          <i class="ph ph-arrows-out-simple"></i>
+          <span>全屏阅读</span>
+        </button>
 
         <div
             v-show="showExpandBtn"

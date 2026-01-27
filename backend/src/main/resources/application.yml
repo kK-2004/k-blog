@@ -6,6 +6,28 @@ spring:
   mvc:
     async:
       request-timeout: 120s
+  # Redis 缓存配置
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 1000ms
+  # Cache 配置
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000  # 默认缓存 5 分钟（毫秒）
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "kblog:"
 
 server:
   port: 8087
@@ -13,6 +35,10 @@ server:
 app:
   cors:
     allowed-origins: "http://localhost:5173,http://localhost:4173"
+  hot-posts:
+    enabled: true
+    window-minutes: 10
+    list-size: 10
   ip:
     fastapi:
       enabled: true
@@ -33,7 +59,7 @@ app:
       • 要点一：[关键信息]
       • 要点二：[关键信息]
       • 要点三：[关键信息]
-      [可选 1-2 个补充要点]
+      ...
 
       【要求】
       - 字数：150-250 字

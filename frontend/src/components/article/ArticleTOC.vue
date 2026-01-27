@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick} from 'vue'
 
 export interface Heading {
   id: string
@@ -45,7 +45,7 @@ const handleScroll = () => {
   if (!scrollContainer || !mobileTocBarRef.value || !headerEl) return
 
   // 更新header高度
-  headerHeight.value = headerEl.offsetHeight
+  headerHeight.value = headerEl.getBoundingClientRect().bottom
 
   // 获取滚动容器的滚动距离
   const scrollTop = scrollContainer.scrollTop
@@ -109,38 +109,70 @@ onBeforeUnmount(() => {
   }
 })
 
-const scrollToHeading = (id: string) => {
+const scrollToHeading = async (id: string) => {
   const el = document.getElementById(id)
-  const scrollContainer = document.querySelector('article.overflow-y-auto')
+  const scrollContainer = document.querySelector('article.overflow-y-auto') as HTMLElement | null
 
-  if (!el || !scrollContainer) {
-    console.warn('[TOC] Cannot scroll: element or container not found', { id, hasEl: !!el, hasContainer: !!scrollContainer })
-    return
+  if (!el || !scrollContainer) return
+
+  // 1. 强制折叠移动端目录
+  if (isMobileExpanded.value) {
+    isMobileExpanded.value = false
   }
 
-  const containerEl = scrollContainer as HTMLElement
+  // 2. 等待 Vue 更新 DOM + 浏览器重绘布局
+  await nextTick()
 
-  // 使用 requestAnimationFrame 确保布局稳定后再计算位置
+  // 使用 requestAnimationFrame 确保在下一帧渲染后计算
   requestAnimationFrame(() => {
-    const containerRect = containerEl.getBoundingClientRect()
-    const targetTop = el.getBoundingClientRect().top - containerRect.top + containerEl.scrollTop
+    // 重新获取元素引用（防止引用失效）
+    const targetEl = document.getElementById(id)
+    if (!targetEl) return
 
+    // --- 核心计算逻辑 ---
+
+    // A. 获取基础参数
     const headerEl = document.querySelector('[data-article-header]') as HTMLElement | null
-    const tocBarEl = document.querySelector('[data-article-toc-bar]') as HTMLElement | null
+    // 此时菜单已折叠，offsetHeight 是只有栏目条的高度（不含展开列表）
+    const tocBarHeight = mobileTocBarRef.value?.offsetHeight || 0
+    const globalHeaderHeight = headerEl?.getBoundingClientRect().height || headerHeight.value || 0
 
-    const headerBottom = headerEl?.getBoundingClientRect().bottom ?? 0
-    const headerOverlap = Math.max(0, headerBottom - containerRect.top)
-    const tocBarHeight = tocBarEl?.offsetHeight ?? 0
-    const scrollOffset: number = headerOverlap + tocBarHeight + 12
+    // B. 计算目标的"绝对"位置（相对于滚动容器内容的顶部）
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const targetRect = targetEl.getBoundingClientRect()
+    const currentScrollTop = scrollContainer.scrollTop
+    const targetAbsoluteTop = currentScrollTop + (targetRect.top - containerRect.top)
 
-    containerEl.scrollTo({
-      top: Math.max(0, targetTop - scrollOffset),
+    // C. 确定偏移量 (Offset)
+    const isMobile = window.matchMedia('(max-width: 1024px)').matches
+    let offset = 20 // 基础 Padding
+
+    if (isMobile) {
+      const safeTocOriginalTop = tocOriginalOffsetTop.value > 0 ? tocOriginalOffsetTop.value : 0
+
+      // 判读逻辑简化：只要目标位置在 TOC 初始位置下方，最终状态 TOC 肯定是 Fixed 的
+      // 加上一个小的容错 buffer (5px)
+      const willBeFixed = targetAbsoluteTop > (safeTocOriginalTop - globalHeaderHeight + 5)
+
+      if (willBeFixed) {
+        offset += globalHeaderHeight + tocBarHeight
+      } else {
+        offset += globalHeaderHeight
+      }
+    } else {
+      // 桌面端通常只需要减去头部高度
+      offset += globalHeaderHeight
+    }
+
+    // D. 执行滚动
+    const finalScrollTop = Math.max(0, targetAbsoluteTop - offset)
+
+    scrollContainer.scrollTo({
+      top: finalScrollTop,
       behavior: 'smooth'
     })
 
     emit('navigate', id)
-    // 移动端点击后自动折叠目录
-    isMobileExpanded.value = false
   })
 }
 
