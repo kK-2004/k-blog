@@ -4,10 +4,13 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Data;
+
 import java.time.Instant;
 
 @Entity
 @Table(name = "admin_users")
+@Data
 public class AdminUserEntity {
 
     @Id
@@ -19,13 +22,13 @@ public class AdminUserEntity {
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, columnDefinition = "datetime(3)")
     private Instant createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = false, columnDefinition = "datetime(3)")
     private Instant updatedAt;
 
-    @Column(name = "last_login_at")
+    @Column(name = "last_login_at", columnDefinition = "datetime(3)")
     private Instant lastLoginAt;
 
     @Column(name = "last_login_ip", length = 64)

@@ -109,15 +109,16 @@ const switchDrawerTab = (tab: 'profile' | 'hotposts') => {
 }
 
 // 路由守卫：未登录不能访问 admin 和 settings
-watch(currentView, (newView) => {
-  if (!authReady.value) return
+// 同时监听 currentView 和 authReady，确保 authReady 就绪后也能触发刷新
+watch([currentView, authReady], ([newView, ready]) => {
+  if (!ready) return
   if ((newView === 'admin' || newView === 'settings') && !isAuthenticated.value) {
     navigateTo('login')
   }
   if (newView === 'admin') {
     refreshPosts()
   }
-})
+}, { immediate: true })
 
 onMounted(async () => {
   await Promise.all([refreshAuth(), loadPublicProfile()])

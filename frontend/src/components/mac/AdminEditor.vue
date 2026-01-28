@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, readonly, ref, watch } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import ImageLightbox from './ImageLightbox.vue'
 
 const props = defineProps<{
   initialContent?: string
+  initialTitle?: string
   isOpen: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'save', content: string): void
+  (e: 'save', content: string, title: string): void
 }>()
 
 const content = ref(props.initialContent || '')
+const title = ref(props.initialTitle || '')
+const originalTitle = ref(props.initialTitle || '')
+const originalContent = ref(props.initialContent || '')
+
+const hasUnsavedChanges = computed(() =>
+  title.value !== originalTitle.value ||
+  content.value !== originalContent.value
+)
 const previewMode = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const codeMenuOpen = ref(false)
@@ -29,6 +38,54 @@ watch(
     content.value = newVal || ''
   },
 )
+
+watch(
+  () => props.initialTitle,
+  (newVal) => {
+    title.value = newVal || ''
+    originalTitle.value = newVal || ''
+  },
+)
+
+watch(
+  () => props.isOpen,
+  (isOpen) => {
+    if (isOpen) {
+      originalTitle.value = props.initialTitle || ''
+      originalContent.value = props.initialContent || ''
+    }
+  },
+)
+
+const handleClose = () => {
+  if (hasUnsavedChanges.value) {
+    if (confirm('你有未保存的更改，确定要离开吗？')) {
+      emit('close')
+    }
+  } else {
+    emit('close')
+  }
+}
+
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (hasUnsavedChanges.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+// 暴露给父组件使用
+defineExpose({
+  hasUnsavedChanges: readonly(hasUnsavedChanges)
+})
 
 const insertText = (before: string, after = '') => {
   const textarea = textareaRef.value
@@ -175,11 +232,16 @@ const closeLightbox = () => {
   <div v-if="isOpen" class="fixed inset-0 z-[100] bg-white dark:bg-[#1e1e1e] flex flex-col animate-[fadeIn_0.2s_ease-out]">
     <div class="h-14 border-b border-gray-200 dark:border-white/10 flex items-center justify-between px-6 bg-gray-50 dark:bg-[#252525]">
       <div class="flex items-center gap-4">
-        <button class="text-gray-500 hover:text-red-500 transition-colors" @click="emit('close')">
+        <button class="text-gray-500 hover:text-red-500 transition-colors" @click="handleClose">
           <i class="ph ph-x text-xl"></i>
         </button>
         <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-        <h2 class="font-bold text-gray-700 dark:text-gray-200">Editor</h2>
+        <input
+          v-model="title"
+          type="text"
+          placeholder="输入文章标题..."
+          class="px-3 py-1.5 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 dark:focus:border-blue-400 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all w-64 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+        />
       </div>
 
       <div class="flex items-center gap-2">
@@ -289,7 +351,7 @@ const closeLightbox = () => {
         >
           {{ previewMode ? 'Edit' : 'Preview' }}
         </button>
-        <button class="text-sm font-medium px-4 py-1.5 rounded bg-[#007AFF] text-white hover:opacity-90 shadow-md" @click="emit('save', content)">
+        <button class="text-sm font-medium px-4 py-1.5 rounded bg-[#007AFF] text-white hover:opacity-90 shadow-md" @click="emit('save', content, title)">
           Save
         </button>
       </div>

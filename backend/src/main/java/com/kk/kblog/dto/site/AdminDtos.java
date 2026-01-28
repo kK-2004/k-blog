@@ -62,4 +62,10 @@ public final class AdminDtos {
 
     public record UpdatePasswordRequest(@NotBlank String oldPassword, @NotBlank String newPassword) {
     }
+
+    public record LastLoginInfoDto(
+            Instant lastLoginAt,
+            String lastLoginLocation
+    ) {
+    }
 }

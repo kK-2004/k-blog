@@ -7,8 +7,8 @@ export type CreatePostRequest = {
   pinned?: boolean
 }
 
-export async function listPosts(): Promise<Post[]> {
-  return apiFetch<Post[]>('/api/posts')
+export async function listPosts(options?: { cache?: boolean }): Promise<Post[]> {
+  return apiFetch<Post[]>('/api/posts', {}, options)
 }
 
 export async function listPostsPage(page: number, size = 5): Promise<Post[]> {

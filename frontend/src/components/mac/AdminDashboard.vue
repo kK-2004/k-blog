@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Post, QuickAction } from '@/api/types'
 import AdminEditor from './AdminEditor.vue'
 import ProfileCenter from '@/views/ProfileCenter.vue'
@@ -24,9 +24,20 @@ const currentView = ref<'posts' | 'profile'>('posts')
 const isEditorOpen = ref(false)
 const currentEditId = ref<number | null>(null)
 const editorContent = ref('')
+const editorTitle = ref('')
 const isCreating = ref(false)
+const editorRef = ref<InstanceType<typeof AdminEditor> | null>(null)
+const hashWhenOpened = ref('')
 
 const quickActions = ref<QuickAction[]>([])
+
+// 本地响应式 posts，确保列表能正确刷新
+const localPosts = ref<Post[]>([...props.posts])
+
+// 监听 props.posts 变化，同步到本地
+watch(() => props.posts, (newPosts) => {
+  localPosts.value = [...newPosts]
+}, { deep: true })
 
 const loadQuickActions = async () => {
   try {
@@ -48,6 +59,7 @@ const openQuickAction = (item: QuickAction) => {
 const openEditor = (post: Post) => {
   currentEditId.value = post.id
   editorContent.value = post.content
+  editorTitle.value = post.title
   isEditorOpen.value = true
 }
 
@@ -55,6 +67,7 @@ const openCreate = () => {
   isCreating.value = true
   currentEditId.value = null
   editorContent.value = ''
+  editorTitle.value = ''
   isEditorOpen.value = true
 }
 
@@ -62,37 +75,40 @@ const closeEditor = () => {
   isEditorOpen.value = false
   currentEditId.value = null
   isCreating.value = false
+  editorTitle.value = ''
 }
 
 const refreshPosts = async () => {
-  const posts = await listPosts()
-  emit('update:posts', posts)
-  emit('refresh')
+  const posts = await listPosts({ cache: false })
+  localPosts.value = posts  // 更新本地数据
 }
 
-const savePost = async (newContent: string) => {
+const savePost = async (newContent: string, newTitle: string) => {
+  if (!newTitle?.trim()) {
+    alert('请输入文章标题')
+    return
+  }
+  if (!newContent?.trim()) {
+    alert('内容不能为空')
+    return
+  }
+
   if (isCreating.value) {
-    const title = window.prompt('Title?')?.trim()
-    if (!title) return
-    if (!newContent?.trim()) {
-      window.alert('内容不能为空')
-      return
-    }
-    await createPost({ title, content: newContent, pinned: false })
+    await createPost({ title: newTitle.trim(), content: newContent, pinned: false })
     await refreshPosts()
     closeEditor()
     return
   }
 
-  const post = props.posts.find((p) => p.id === currentEditId.value)
+  const post = localPosts.value.find((p) => p.id === currentEditId.value)
   if (!post) return
-  await updatePost(post.id, { ...post, content: newContent })
+  await updatePost(post.id, { ...post, title: newTitle.trim(), content: newContent })
   await refreshPosts()
   closeEditor()
 }
 
 const togglePin = async (postId: number) => {
-  const post = props.posts.find((p) => p.id === postId)
+  const post = localPosts.value.find((p) => p.id === postId)
   if (post) {
     await updatePost(post.id, { ...post, pinned: !post.pinned })
     await refreshPosts()
@@ -119,8 +135,39 @@ const navigateToArticle = (postId: number) => {
   router.navigateTo('article', { articleId: postId })
 }
 
+// 监听编辑器打开状态，记录当前哈希
+watch(isEditorOpen, (isOpen) => {
+  if (isOpen) {
+    hashWhenOpened.value = window.location.hash
+  }
+})
+
+// 哈希变化拦截
+const handleHashChange = () => {
+  if (!isEditorOpen.value) return
+  if (!editorRef.value?.hasUnsavedChanges) return
+
+  // 恢复原哈希并弹出确认
+  const newHash = window.location.hash
+  window.location.hash = hashWhenOpened.value
+
+  setTimeout(() => {
+    if (confirm('你有未保存的更改，确定要离开吗？')) {
+      // 用户确认：恢复新哈希（触发路由跳转）并关闭编辑器
+      window.location.hash = newHash
+      closeEditor()
+    }
+    // 用户取消：哈希已经恢复，不做任何事
+  }, 0)
+}
+
 onMounted(() => {
   void loadQuickActions()
+  window.addEventListener('hashchange', handleHashChange)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('hashchange', handleHashChange)
 })
 </script>
 
@@ -199,7 +246,7 @@ onMounted(() => {
           </thead>
           <tbody class="divide-y divide-gray-50 dark:divide-white/5">
           <tr
-              v-for="post in props.posts"
+              v-for="post in localPosts"
               :key="post.id"
               class="transition-colors group cursor-pointer"
               :class="{
@@ -254,7 +301,7 @@ onMounted(() => {
       </div>
 
       <Teleport to="body">
-        <AdminEditor :isOpen="isEditorOpen" :initialContent="editorContent" @close="closeEditor" @save="savePost" />
+        <AdminEditor ref="editorRef" :isOpen="isEditorOpen" :initialContent="editorContent" :initialTitle="editorTitle" @close="closeEditor" @save="savePost" />
       </Teleport>
     </div>
 

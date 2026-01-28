@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { login } from '@/api/admin'
-import type { AdminMe } from '@/api/types'
+import { ref, computed, onMounted } from 'vue'
+import { login, getLastLoginInfo } from '@/api/admin'
+import type { AdminMe, LastLoginInfo } from '@/api/types'
 
 const emit = defineEmits<{
   (e: 'login-success', me: AdminMe): void
@@ -9,6 +9,21 @@ const emit = defineEmits<{
 
 const password = ref('')
 const loading = ref(false)
+const lastLoginInfo = ref<LastLoginInfo | null>(null)
+
+// 格式化上次登录时间
+const formattedLastLogin = computed(() => {
+  if (!lastLoginInfo.value?.lastLoginAt) return null
+  const date = new Date(lastLoginInfo.value.lastLoginAt)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(/\//g, '-')
+})
 
 const onSubmit = async () => {
   if (!password.value.trim() || loading.value) return
@@ -23,6 +38,14 @@ const onSubmit = async () => {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  try {
+    lastLoginInfo.value = await getLastLoginInfo()
+  } catch (e) {
+    console.warn('Failed to fetch last login info', e)
+  }
+})
 </script>
 
 <template>
@@ -50,6 +73,17 @@ const onSubmit = async () => {
         >
           {{ loading ? 'Signing in...' : 'Enter' }}
         </button>
+
+        <!-- 上次登录信息 -->
+        <div
+          v-if="lastLoginInfo?.lastLoginAt && lastLoginInfo?.lastLoginLocation"
+          class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600/50"
+        >
+          <div class="flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <i class="ph ph-clock-counter-clockwise text-sm"></i>
+            <span>上次登录: {{ formattedLastLogin }} · {{ lastLoginInfo.lastLoginLocation }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

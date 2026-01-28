@@ -241,6 +241,7 @@ watch(() => props.isSidebarOpen, async () => {
                     <ArticleMeta
                         :author="post.author"
                         :createdAt="post.createdAt"
+                        :updatedAt="post.updatedAt"
                         :readTime="readStats.time"
                         :wordCount="readStats.count"
                         :views="post.views"

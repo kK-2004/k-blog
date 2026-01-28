@@ -337,27 +337,40 @@ const genderOptions = [
             <i class="ph ph-gender-intersex text-lg"></i>
             性别
           </label>
-          <div :class="{ 'pointer-events-none opacity-60': !isEditing }" class="flex gap-3">
-            <label
-                v-for="option in genderOptions"
-                :key="option.value"
-                class="flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border cursor-pointer transition-all"
-                :class="[
-                formData.gender === option.value
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-              ]"
+          <div class="flex gap-2">
+            <div :class="{ 'pointer-events-none opacity-60': !isEditing }" class="flex-1 flex gap-3">
+              <label
+                  v-for="option in genderOptions"
+                  :key="option.value"
+                  class="flex-1 flex items-center gap-2 px-4 py-3 rounded-lg border cursor-pointer transition-all"
+                  :class="[
+                  formData.gender === option.value
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                ]"
+              >
+                <input
+                    v-model="formData.gender"
+                    :value="option.value"
+                    type="radio"
+                    :disabled="!isEditing"
+                    class="hidden"
+                />
+                <i :class="['ph', option.icon, 'text-lg']"></i>
+                {{ option.label }}
+              </label>
+            </div>
+            <button
+                v-if="isFieldFilled('gender')"
+                class="px-3 py-2 rounded-lg border transition-colors text-xs font-medium"
+                :class="isFieldVisible('gender')
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+                : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'"
+                :title="isFieldVisible('gender') ? '已公开' : '已隐藏'"
+                @click="toggleVisibility('gender')"
             >
-              <input
-                  v-model="formData.gender"
-                  :value="option.value"
-                  type="radio"
-                  :disabled="!isEditing"
-                  class="hidden"
-              />
-              <i :class="['ph', option.icon, 'text-lg']"></i>
-              {{ option.label }}
-            </label>
+              <i :class="['ph', isFieldVisible('gender') ? 'ph-eye' : 'ph-eye-slash']"></i>
+            </button>
           </div>
         </div>
 

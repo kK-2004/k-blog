@@ -1,7 +1,5 @@
 package com.kk.kblog.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -32,16 +30,5 @@ public class RedisConfig {
         template.setHashValueSerializer(new StringRedisSerializer());
         template.afterPropertiesSet();
         return template;
-    }
-
-    /**
-     * ObjectMapper 用于 JSON 序列化/反序列化
-     */
-    @Bean
-    public ObjectMapper objectMapper() {
-        return JsonMapper.builder()
-                .build()
-                .registerModules(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 }

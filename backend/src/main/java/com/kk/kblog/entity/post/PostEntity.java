@@ -7,11 +7,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+
+import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "posts")
+@Data
 public class PostEntity {
 
     @Id
@@ -25,11 +28,11 @@ public class PostEntity {
     private String title;
 
     @CreationTimestamp
-    @Column(name = "created_at", columnDefinition = "datetime(3) not null default current_timestamp(3)", updatable = false)
+    @Column(name = "created_at", columnDefinition = "datetime(3) not null", updatable = false)
     private Instant createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at", columnDefinition = "datetime(3) not null default current_timestamp(3) on update current_timestamp(3)")
+    @Column(name = "updated_at", columnDefinition = "datetime(3) not null")
     private Instant updatedAt;
 
     @Column(nullable = false, columnDefinition = "LONGTEXT")

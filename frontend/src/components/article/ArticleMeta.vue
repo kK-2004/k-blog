@@ -5,6 +5,7 @@ import AvatarCircle from '@/components/mac/AvatarCircle.vue'
 const props = defineProps<{
   author: string
   createdAt: number | null
+  updatedAt: number | null
   readTime: string
   wordCount: string
   views: number
@@ -15,6 +16,31 @@ const props = defineProps<{
 // 格式化发布时间
 const formattedDate = computed(() => {
   const ms = props.createdAt
+  if (typeof ms === 'number' && Number.isFinite(ms)) {
+    const diffMs = Date.now() - ms
+    if (diffMs < 60_000) return '刚刚'
+    const diffMinutes = Math.floor(diffMs / 60_000)
+    if (diffMinutes < 60) {
+      const rounded = Math.max(5, Math.floor(diffMinutes / 5) * 5)
+      return `${rounded}分钟前`
+    }
+    return new Date(ms).toLocaleString('zh-CN')
+  }
+  return ''
+})
+
+// 是否显示更新时间（updatedAt 与 createdAt 相差超过1小时且超过5秒误差时才显示）
+// 允许5秒误差是为了解决后端创建文章时 createdAt 和 updatedAt 微小差异的问题
+const showUpdatedDate = computed(() => {
+  if (!props.updatedAt || !props.createdAt) return false
+  if (typeof props.updatedAt !== 'number' || typeof props.createdAt !== 'number') return false
+  const diff = props.updatedAt - props.createdAt
+  return diff > 5000 && diff > 3600_000  // 允许5秒误差，且需超过1小时
+})
+
+// 格式化更新时间
+const formattedUpdatedDate = computed(() => {
+  const ms = props.updatedAt
   if (typeof ms === 'number' && Number.isFinite(ms)) {
     const diffMs = Date.now() - ms
     if (diffMs < 60_000) return '刚刚'
@@ -44,7 +70,10 @@ const formattedDate = computed(() => {
 
       <div class="flex-1">
         <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ author }}</div>
-        <div class="text-xs text-gray-400 font-mono">{{ formattedDate }}</div>
+        <div class="text-xs text-gray-400 font-mono">
+          <template v-if="showUpdatedDate">更新于 {{ formattedUpdatedDate }}</template>
+          <template v-else>{{ formattedDate }}</template>
+        </div>
       </div>
     </div>
 

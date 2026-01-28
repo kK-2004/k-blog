@@ -42,7 +42,7 @@ public class PostCommentEntity {
     private String toUser;
 
     @CreationTimestamp
-    @Column(name = "created_at", columnDefinition = "datetime(3) not null default current_timestamp(3)", updatable = false)
+    @Column(name = "created_at", columnDefinition = "datetime(3) not null", updatable = false)
     private Instant createdAt;
 
     protected PostCommentEntity() {

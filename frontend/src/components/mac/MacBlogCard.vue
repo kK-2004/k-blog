@@ -1336,7 +1336,7 @@ const closeCollapseHint = () => {
       <Transition name="fade-slide">
         <div
             v-if="showCollapseHint && arrowPath"
-            class="fixed z-[60] pointer-events-none"
+            class="fixed z-[60] pointer-events-none hidden lg:block"
             :style="{
               width: `${svgSize.width}px`,
               height: `${svgSize.height}px`,

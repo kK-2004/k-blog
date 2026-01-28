@@ -1,6 +1,6 @@
 import { apiFetch, ApiError, getCookie } from './http'
 import { ElMessage } from 'element-plus'
-import type { AdminMe } from './types'
+import type { AdminMe, LastLoginInfo } from './types'
 
 export async function login(password: string): Promise<AdminMe> {
   const xsrf = getCookie('XSRF-TOKEN')
@@ -26,6 +26,10 @@ export async function login(password: string): Promise<AdminMe> {
     throw new ApiError(res.status, message, errBody)
   }
   return me()
+}
+
+export async function getLastLoginInfo(): Promise<LastLoginInfo> {
+  return apiFetch<LastLoginInfo>('/api/public/last-login', {}, { cacheMaxAge: 60000 })
 }
 
 export async function logout(): Promise<void> {
