@@ -21,7 +21,6 @@ ARG MAVEN_PROFILE=prod
 ARG SKIP_TESTS=true
 ARG BUILD_NUMBER
 
-# JDK17 + Lombok 相关参数
 ENV MAVEN_OPTS="-Xmx2048m -Xms1024m \
     --add-opens=java.base/java.util=ALL-UNNAMED \
     --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
