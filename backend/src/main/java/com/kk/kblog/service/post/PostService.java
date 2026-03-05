@@ -78,24 +78,39 @@ public class PostService {
     @Transactional
     public PostDto updatePost(long id, UpdatePostRequest request) {
         var post = postRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("post not found: " + id));
+        var contentChanged = !Objects.equals(post.getTitle(), request.title())
+                || !Objects.equals(post.getContent(), request.content());
         post.setTitle(request.title());
         post.setContent(request.content());
         post.setViews(request.views());
         post.setLikes(request.likes());
         post.setComments(request.comments());
         post.setPinned(request.pinned());
+        if (contentChanged) {
+            post.touchUpdatedAt();
+        }
         return toDto(post, preloadAuthorNames(List.of(post)));
     }
 
     @Transactional
     public PostDto patchPost(long id, PatchPostRequest request) {
         var post = postRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("post not found: " + id));
-        if (request.title() != null) post.setTitle(request.title());
-        if (request.content() != null) post.setContent(request.content());
+        var contentChanged = false;
+        if (request.title() != null && !Objects.equals(request.title(), post.getTitle())) {
+            post.setTitle(request.title());
+            contentChanged = true;
+        }
+        if (request.content() != null && !Objects.equals(request.content(), post.getContent())) {
+            post.setContent(request.content());
+            contentChanged = true;
+        }
         if (request.views() != null) post.setViews(request.views());
         if (request.likes() != null) post.setLikes(request.likes());
         if (request.comments() != null) post.setComments(request.comments());
         if (request.pinned() != null) post.setPinned(request.pinned());
+        if (contentChanged) {
+            post.touchUpdatedAt();
+        }
         return toDto(post, preloadAuthorNames(List.of(post)));
     }
 

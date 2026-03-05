@@ -5,12 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
 import lombok.Data;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "posts")
@@ -27,11 +26,9 @@ public class PostEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @CreationTimestamp
     @Column(name = "created_at", columnDefinition = "datetime(3) not null", updatable = false)
     private Instant createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at", columnDefinition = "datetime(3) not null")
     private Instant updatedAt;
 
@@ -81,6 +78,21 @@ public class PostEntity {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        var now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    public void touchUpdatedAt() {
+        this.updatedAt = Instant.now();
     }
 
     public Instant getCreatedAt() {
