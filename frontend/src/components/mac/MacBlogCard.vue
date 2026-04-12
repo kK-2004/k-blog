@@ -138,10 +138,7 @@ const displayPostTime = computed(() => {
     const diffMs = Date.now() - ms
     if (diffMs < 60_000) return '刚刚'
     const diffMinutes = Math.floor(diffMs / 60_000)
-    if (diffMinutes < 60) {
-      const rounded = Math.max(5, Math.floor(diffMinutes / 5) * 5)
-      return `${rounded}分钟前`
-    }
+    if (diffMinutes < 10) return `${diffMinutes}分钟前`
     return new Date(ms).toLocaleString('zh-CN')
   }
   return ''

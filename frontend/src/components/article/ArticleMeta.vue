@@ -20,22 +20,17 @@ const formattedDate = computed(() => {
     const diffMs = Date.now() - ms
     if (diffMs < 60_000) return '刚刚'
     const diffMinutes = Math.floor(diffMs / 60_000)
-    if (diffMinutes < 60) {
-      const rounded = Math.max(5, Math.floor(diffMinutes / 5) * 5)
-      return `${rounded}分钟前`
-    }
+    if (diffMinutes < 10) return `${diffMinutes}分钟前`
     return new Date(ms).toLocaleString('zh-CN')
   }
   return ''
 })
 
-// 是否显示更新时间（updatedAt 与 createdAt 相差超过1小时且超过5秒误差时才显示）
-// 允许5秒误差是为了解决后端创建文章时 createdAt 和 updatedAt 微小差异的问题
+// 是否显示更新时间（updatedAt 与 createdAt 相差超过5秒时显示，排除后端初始化的微小差异）
 const showUpdatedDate = computed(() => {
   if (!props.updatedAt || !props.createdAt) return false
   if (typeof props.updatedAt !== 'number' || typeof props.createdAt !== 'number') return false
-  const diff = props.updatedAt - props.createdAt
-  return diff > 5000 && diff > 3600_000  // 允许5秒误差，且需超过1小时
+  return props.updatedAt - props.createdAt > 5000
 })
 
 // 格式化更新时间
@@ -45,10 +40,7 @@ const formattedUpdatedDate = computed(() => {
     const diffMs = Date.now() - ms
     if (diffMs < 60_000) return '刚刚'
     const diffMinutes = Math.floor(diffMs / 60_000)
-    if (diffMinutes < 60) {
-      const rounded = Math.max(5, Math.floor(diffMinutes / 5) * 5)
-      return `${rounded}分钟前`
-    }
+    if (diffMinutes < 10) return `${diffMinutes}分钟前`
     return new Date(ms).toLocaleString('zh-CN')
   }
   return ''
