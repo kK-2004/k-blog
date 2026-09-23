@@ -21,15 +21,15 @@ import java.time.Duration;
 import java.util.function.Consumer;
 
 @Service
-public class GlmAiService {
-    private static final Logger log = LoggerFactory.getLogger(GlmAiService.class);
-    private final GlmProperties props;
+public class AiService {
+    private static final Logger log = LoggerFactory.getLogger(AiService.class);
+    private final AiProperties props;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final String summaryPrompt;
 
-    public GlmAiService(
-            GlmProperties props,
+    public AiService(
+            AiProperties props,
             ObjectMapper objectMapper,
             @Value("${app.ai.summary_prompt:}") String summaryPrompt
     ) {
@@ -47,7 +47,7 @@ public class GlmAiService {
 
     public String summarize(String content) {
         if (!isEnabled()) {
-            log.warn("GLM disabled, using fallback summary");
+            log.warn("AI disabled, using fallback summary");
             return fallbackSummary(content);
         }
 
@@ -57,14 +57,14 @@ public class GlmAiService {
                 .build();
 
         try {
-            log.info("GLM summarize request: model={}, url={}, promptLen={}, contentLen={}",
+            log.info("AI summarize request: model={}, url={}, promptLen={}, contentLen={}",
                     props.getModel(),
                     props.getBaseUrl(),
                     summaryPrompt.length(),
                     content == null ? 0 : content.length());
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() / 100 != 2) {
-                throw new IOException("GLM API error: HTTP " + response.statusCode() + " body=" + safeBodySnippet(response.body()));
+                throw new IOException("AI API error: HTTP " + response.statusCode() + " body=" + safeBodySnippet(response.body()));
             }
             var root = objectMapper.readTree(response.body());
             var choices = root.path("choices");
@@ -74,14 +74,14 @@ public class GlmAiService {
             }
             return "";
         } catch (Exception e) {
-            log.warn("GLM summarize failed, fallback used", e);
+            log.warn("AI summarize failed, fallback used", e);
             return fallbackSummary(content);
         }
     }
 
     public void summarizeStream(String content, Consumer<String> onDelta) throws IOException, InterruptedException {
         if (!isEnabled()) {
-            log.info("GLM disabled, streaming fallback summary");
+            log.info("AI disabled, streaming fallback summary");
             onDelta.accept(fallbackSummary(content));
             return;
         }
@@ -91,15 +91,15 @@ public class GlmAiService {
                 .POST(HttpRequest.BodyPublishers.ofString(reqBody, StandardCharsets.UTF_8))
                 .build();
 
-        log.info("GLM stream request: model={}, url={}, promptLen={}, contentLen={}",
+        log.info("AI stream request: model={}, url={}, promptLen={}, contentLen={}",
                 props.getModel(),
                 props.getBaseUrl(),
                 summaryPrompt.length(),
                 content == null ? 0 : content.length());
         var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() / 100 != 2) {
-            log.warn("GLM stream error: HTTP {}", response.statusCode());
-            throw new IOException("GLM API error: HTTP " + response.statusCode());
+            log.warn("AI stream error: HTTP {}", response.statusCode());
+            throw new IOException("AI API error: HTTP " + response.statusCode());
         }
 
         try (var is = response.body();

@@ -8,10 +8,10 @@ import org.springframework.stereotype.Component;
 @Setter
 @Getter
 @Component
-@ConfigurationProperties(prefix = "app.ai.glm")
-public class GlmProperties {
+@ConfigurationProperties(prefix = "app.ai")
+public class AiProperties {
     /**
-     * BigModel (GLM) API Key, e.g. from env `GLM_API_KEY`.
+     * LLM API Key, e.g. from env `AI_API_KEY`.
      */
     private String apiKey;
 

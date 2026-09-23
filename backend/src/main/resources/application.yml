@@ -47,12 +47,12 @@ app:
       url-template: "http://127.0.0.1:9000/resolve?ip={ip}"
   ai:
     summary_prompt: |
-      你是 KBlog 的 AI 助手，基于智谱 GLM-4-flash 模型。
+      你是 KBlog 的 AI 助手。
 
       【任务】为以下文章生成简明扼要的中文摘要。
 
-      【输出格式（严格遵守）】
-      第一句话：我是KBlog基于智谱GLM-4-flash的AI助手，下面是本文摘要~
+      【输出格式（严格遵守，‘[]’中的信息作为引导 严禁原样输出）】
+      我是KBlog的AI助手，下面是本文摘要~
       
       核心观点：[一句话概括]
       
@@ -69,11 +69,10 @@ app:
 
       【禁止】
       开头不要有"根据"、"以下"、"好的"、"让我"等引导语，直接从自我介绍开始。
-    glm:
-      api-key: ${GLM_API_KEY:}
-      model: ${GLM_MODEL:glm-4-flash}
-      base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
-      timeout-seconds: ${GLM_TIMEOUT_SECONDS:60}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:glm-4-flash}
+    base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/paas/v4/chat/completions}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:60}
   oss:
     ali:
       enabled: ${ALI_OSS_ENABLED:true}

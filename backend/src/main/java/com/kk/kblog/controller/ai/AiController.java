@@ -1,6 +1,6 @@
 package com.kk.kblog.controller.ai;
 
-import com.kk.kblog.service.ai.GlmAiService;
+import com.kk.kblog.service.ai.AiService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
@@ -20,10 +20,10 @@ import java.nio.charset.StandardCharsets;
 @RequestMapping("/api/ai")
 public class AiController {
     private static final Logger log = LoggerFactory.getLogger(AiController.class);
-    private final GlmAiService glmAiService;
+    private final AiService aiService;
 
-    public AiController(GlmAiService glmAiService) {
-        this.glmAiService = glmAiService;
+    public AiController(AiService aiService) {
+        this.aiService = aiService;
     }
 
     public record SummaryRequest(@NotBlank String content) {
@@ -34,10 +34,10 @@ public class AiController {
 
     @PostMapping("/summary")
     public SummaryResponse summary(@Valid @RequestBody SummaryRequest request) {
-        log.info("AI summary request: contentLength={}, glmEnabled={}",
+        log.info("AI summary request: contentLength={}, aiEnabled={}",
                 request.content() == null ? 0 : request.content().length(),
-                glmAiService.isEnabled());
-        var summary = glmAiService.summarize(request.content());
+                aiService.isEnabled());
+        var summary = aiService.summarize(request.content());
         log.info("AI summary done: summaryLength={}", summary == null ? 0 : summary.length());
         return new SummaryResponse(summary);
     }
@@ -46,11 +46,11 @@ public class AiController {
     public ResponseEntity<StreamingResponseBody> summaryStream(@Valid @RequestBody SummaryRequest request) {
         StreamingResponseBody body = outputStream -> {
             var total = new StringBuilder();
-            log.info("AI summary stream start: contentLength={}, glmEnabled={}",
+            log.info("AI summary stream start: contentLength={}, aiEnabled={}",
                     request.content() == null ? 0 : request.content().length(),
-                    glmAiService.isEnabled());
+                    aiService.isEnabled());
             try {
-                glmAiService.summarizeStream(request.content(), delta -> {
+                aiService.summarizeStream(request.content(), delta -> {
                     try {
                         total.append(delta);
                         outputStream.write(delta.getBytes(StandardCharsets.UTF_8));
@@ -63,7 +63,7 @@ public class AiController {
             } catch (Exception e) {
                 log.warn("AI summary stream failed: totalLength={}", total.length(), e);
                 if (total.isEmpty()) {
-                    var fallback = glmAiService.summarize(request.content());
+                    var fallback = aiService.summarize(request.content());
                     outputStream.write(fallback.getBytes(StandardCharsets.UTF_8));
                     outputStream.flush();
                     log.info("AI summary stream fallback sent: fallbackLength={}", fallback == null ? 0 : fallback.length());

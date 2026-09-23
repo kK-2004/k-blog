@@ -25,5 +25,4 @@ app:
     username: Admin
     password: admin
   ai:
-    glm:
-      api-key: ${GLM_API_KEY:}
+    api-key: ${AI_API_KEY:}
