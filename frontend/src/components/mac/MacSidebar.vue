@@ -9,9 +9,16 @@ const props = defineProps<{
   isAuthenticated: boolean
 }>()
 
-const { navigateTo } = useHashRouter()
+const { navigateTo, adminPage } = useHashRouter()
 const { visibleMenuItems, loadConfig } = useBackendSidebarConfig()
 void loadConfig()
+
+// 站点设置是后台的子页面：settings 菜单项只在该子页面高亮
+const isActive = (id: string) => {
+  if (id === 'settings') return props.currentView === 'admin' && adminPage.value === 'settings'
+  if (id === 'admin') return props.currentView === 'admin' && adminPage.value !== 'settings'
+  return props.currentView === id
+}
 
 // 根据认证状态过滤可见菜单项
 const filteredMenuItems = computed(() => {
@@ -35,7 +42,7 @@ const filteredMenuItems = computed(() => {
         :key="item.id"
         class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
         :class="
-          currentView === item.id
+          isActive(item.id)
             ? 'bg-[#007AFF] text-white'
             : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10'
         "

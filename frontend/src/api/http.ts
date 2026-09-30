@@ -104,9 +104,9 @@ export async function apiFetch<T>(
         const hash = window.location.hash.slice(1) // Remove #
         const currentPath = hash.startsWith('/') ? hash.slice(1) : hash
 
-        // 只有在 admin 或 settings 页面时才跳转到登录页
+        // 只有在后台页面（含子页面）时才跳转到登录页
         // 在 login 页面（密码错误）或 blog 页面时不跳转
-        if (currentPath === 'admin' || currentPath === 'settings') {
+        if (currentPath === 'admin' || currentPath.startsWith('admin/') || currentPath === 'settings') {
           window.location.hash = '#/login'
         }
       }

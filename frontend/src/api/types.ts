@@ -84,8 +84,3 @@ export type AdminMe = {
   lastLoginIp: string | null
   lastLoginLocation: string | null
 }
-
-export type LastLoginInfo = {
-  lastLoginAt: string | null
-  lastLoginLocation: string | null
-}

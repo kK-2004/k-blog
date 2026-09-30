@@ -2,7 +2,6 @@ package com.kk.kblog.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kk.kblog.dto.site.AdminDtos.AdminMeDto;
-import com.kk.kblog.dto.site.AdminDtos.LastLoginInfoDto;
 import com.kk.kblog.dto.site.AdminDtos.ProfileVisibility;
 import com.kk.kblog.dto.site.AdminDtos.UpdatePasswordRequest;
 import com.kk.kblog.dto.site.AdminDtos.UpdateProfileRequest;
@@ -51,15 +50,6 @@ public class AdminAuthService {
     @Transactional(readOnly = true)
     public AdminMeDto me() {
         return toMeDto(getAdmin());
-    }
-
-    @Transactional(readOnly = true)
-    public LastLoginInfoDto getLastLoginInfo() {
-        AdminUserEntity admin = getAdmin();
-        return new LastLoginInfoDto(
-                admin.getLastLoginAt(),
-                admin.getLastLoginLocation()
-        );
     }
 
     @Transactional

@@ -3,19 +3,17 @@ import { onMounted, ref, watch } from 'vue'
 import { useClock } from '@/composables/useClock'
 import { useTheme } from '@/composables/useTheme'
 import { useHashRouter } from '@/composables/useHashRouter'
-import { listPosts } from '@/api/posts'
 import { logout as apiLogout, me as apiMe } from '@/api/admin'
 import { getPublicProfile, type PublicProfile } from '@/api/site'
-import type { AdminMe, Post } from '@/api/types'
+import type { AdminMe } from '@/api/types'
 import MacNavBar from '@/components/mac/MacNavBar.vue'
 import MacSidebar from '@/components/mac/MacSidebar.vue'
 import ProfileOverview from '@/components/mac/ProfileOverview.vue'
 import HotPostsList from '@/components/mac/HotPostsList.vue'
 import MobileSideDrawer from '@/components/mac/MobileSideDrawer.vue'
-import AdminView from '@/views/AdminView.vue'
+import AdminLayout from '@/components/admin/AdminLayout.vue'
 import BlogView from '@/views/BlogView.vue'
 import LoginView from '@/views/LoginView.vue'
-import SettingsView from '@/views/SettingsView.vue'
 import ArticleDetailView from '@/views/ArticleDetailView.vue'
 
 const { timeStr } = useClock()
@@ -25,7 +23,6 @@ const { currentView, navigateTo, articleId } = useHashRouter()
 const isSidebarOpen = ref(false)
 const mainRef = ref<HTMLElement | null>(null)
 const mainRefMobile = ref<HTMLElement | null>(null)
-const posts = ref<Post[]>([])
 const isAuthenticated = ref(false)
 const adminMe = ref<AdminMe | null>(null)
 const authReady = ref(false)
@@ -36,10 +33,6 @@ const authorAvatarUrl = ref<string | null>(null)
 const isMobileDrawerOpen = ref(false)
 const drawerTab = ref<'profile' | 'hotposts'>('profile')
 
-const refreshPosts = async () => {
-  posts.value = await listPosts()
-}
-
 const loadPublicProfile = async () => {
   try {
     const profile = await getPublicProfile()
@@ -49,10 +42,6 @@ const loadPublicProfile = async () => {
     publicProfile.value = null
     authorAvatarUrl.value = null
   }
-}
-
-const setPosts = (newPosts: Post[]) => {
-  posts.value = newPosts
 }
 
 const refreshAuth = async () => {
@@ -108,15 +97,12 @@ const switchDrawerTab = (tab: 'profile' | 'hotposts') => {
   drawerTab.value = tab
 }
 
-// 路由守卫：未登录不能访问 admin 和 settings
-// 同时监听 currentView 和 authReady，确保 authReady 就绪后也能触发刷新
+// 路由守卫：未登录不能访问后台
+// 同时监听 currentView 和 authReady，确保 authReady 就绪后也能触发
 watch([currentView, authReady], ([newView, ready]) => {
   if (!ready) return
-  if ((newView === 'admin' || newView === 'settings') && !isAuthenticated.value) {
+  if (newView === 'admin' && !isAuthenticated.value) {
     navigateTo('login')
-  }
-  if (newView === 'admin') {
-    refreshPosts()
   }
 }, { immediate: true })
 
@@ -192,13 +178,6 @@ onMounted(async () => {
                 :scrollContainer="mainRef"
               />
               <LoginView v-else-if="currentView === 'login'" @login-success="onLoginSuccess" />
-              <AdminView
-                v-else-if="currentView === 'admin'"
-                :posts="posts"
-                @update:posts="setPosts"
-                @refresh="refreshPosts"
-              />
-              <SettingsView v-else-if="currentView === 'settings'" />
             </main>
           </div>
           <!-- 右侧预留空间（不拦截事件） -->
@@ -222,13 +201,6 @@ onMounted(async () => {
           :scrollContainer="mainRefMobile"
         />
         <LoginView v-else-if="currentView === 'login'" @login-success="onLoginSuccess" />
-        <AdminView
-          v-else-if="currentView === 'admin'"
-          :posts="posts"
-          @update:posts="setPosts"
-          @refresh="refreshPosts"
-        />
-        <SettingsView v-else-if="currentView === 'settings'" />
       </main>
 
       <!-- 移动端抽屉 -->
@@ -250,6 +222,12 @@ onMounted(async () => {
         :adminMe="adminMe"
         :authorAvatarUrl="authorAvatarUrl"
         :isSidebarOpen="isSidebarOpen"
+      />
+
+      <!-- 后台独立布局，不受前台三栏容器限制；登录后才渲染 -->
+      <AdminLayout
+        v-if="currentView === 'admin' && isAuthenticated"
+        :adminMe="adminMe"
       />
     </div>
   </div>
