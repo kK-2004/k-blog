@@ -67,7 +67,7 @@ watch(() => props.content, () => {
 </script>
 
 <template>
-  <article ref="contentRef" class="prose prose-lg dark:prose-invert max-w-none
+  <article ref="contentRef" class="article-content prose prose-lg dark:prose-invert max-w-none break-words
     prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-gray-900 dark:prose-headings:text-gray-100
     prose-h1:text-3xl prose-h1:mt-12 prose-h1:mb-6
     prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-5 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200 dark:prose-h2:border-white/10
@@ -87,3 +87,18 @@ watch(() => props.content, () => {
   <!-- 图片预览 Lightbox -->
   <ImageLightbox :image-url="lightboxImageUrl" :is-open="!!lightboxImageUrl" @close="closeLightbox" />
 </template>
+
+<style scoped>
+/* 宽表格在自身容器内横向滚动，不撑开正文 */
+.article-content :deep(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.article-content :deep(img),
+.article-content :deep(video),
+.article-content :deep(iframe) {
+  max-width: 100%;
+}
+</style>

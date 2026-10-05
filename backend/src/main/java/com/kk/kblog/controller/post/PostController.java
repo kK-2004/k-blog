@@ -6,6 +6,8 @@ import com.kk.kblog.dto.post.PostRequests.CreatePostRequest;
 import com.kk.kblog.dto.post.PostRequests.PatchPostRequest;
 import com.kk.kblog.dto.post.PostRequests.UpdatePostRequest;
 import com.kk.kblog.service.HotPostsService;
+import com.kk.kblog.service.ai.PostAiSummaryService;
+import com.kk.kblog.service.ai.PostAiSummaryService.AiSummaryView;
 import com.kk.kblog.service.post.PostService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -29,10 +31,13 @@ public class PostController {
 
     private final PostService postService;
     private final HotPostsService hotPostsService;
+    private final PostAiSummaryService postAiSummaryService;
 
-    public PostController(PostService postService, HotPostsService hotPostsService) {
+    public PostController(PostService postService, HotPostsService hotPostsService,
+                          PostAiSummaryService postAiSummaryService) {
         this.postService = postService;
         this.hotPostsService = hotPostsService;
+        this.postAiSummaryService = postAiSummaryService;
     }
 
     @GetMapping
@@ -87,6 +92,23 @@ public class PostController {
     @PostMapping("/{id}/comments/increment")
     public PostDto incrementCommentsLegacy(@PathVariable long id) {
         return postService.incrementComments(id);
+    }
+
+    /**
+     * 获取文章 AI 摘要（Redis → 数据库）；未生成完成时 summary 为空，status 为 GENERATING/FAILED
+     */
+    @GetMapping("/{id}/ai-summary")
+    public AiSummaryView getAiSummary(@PathVariable long id) {
+        return postAiSummaryService.getSummary(id);
+    }
+
+    /**
+     * 批量查询 AI 摘要状态（前端轮询生成中的文章），ids 逗号分隔，最多 50 个
+     */
+    @GetMapping("/ai-summary/status")
+    public List<AiSummaryView> getAiSummaryStatuses(@RequestParam List<Long> ids) {
+        if (ids.size() > 50) throw new IllegalArgumentException("too many ids (max 50)");
+        return postAiSummaryService.getStatuses(ids);
     }
 
     /**

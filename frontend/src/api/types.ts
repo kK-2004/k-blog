@@ -28,6 +28,16 @@ export type Post = {
   likes: number
   comments: number
   pinned: boolean
+  /** AI 摘要状态：发布/修改后后台异步生成 */
+  aiSummaryStatus?: AiSummaryStatus
+}
+
+export type AiSummaryStatus = 'GENERATING' | 'READY' | 'FAILED'
+
+export type AiSummary = {
+  postId: number
+  status: AiSummaryStatus
+  summary: string | null
 }
 
 export type HotPost = {

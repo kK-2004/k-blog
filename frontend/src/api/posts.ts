@@ -1,5 +1,5 @@
 import { apiFetch } from './http'
-import type { HotPost, Post } from './types'
+import type { AiSummary, HotPost, Post } from './types'
 
 export type CreatePostRequest = {
   title: string
@@ -46,4 +46,13 @@ export async function incrementComments(id: number): Promise<Post> {
 
 export async function getHotPosts(): Promise<HotPost[]> {
   return apiFetch<HotPost[]>('/api/posts/hot', {}, { cache: true, cacheMaxAge: 30000 })
+}
+
+export async function getAiSummary(id: number): Promise<AiSummary> {
+  return apiFetch<AiSummary>(`/api/posts/${id}/ai-summary`, {}, { cache: false })
+}
+
+export async function getAiSummaryStatuses(ids: number[]): Promise<AiSummary[]> {
+  const params = new URLSearchParams({ ids: ids.join(',') })
+  return apiFetch<AiSummary[]>(`/api/posts/ai-summary/status?${params.toString()}`, {}, { cache: false })
 }

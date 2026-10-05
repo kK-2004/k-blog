@@ -2,6 +2,8 @@ package com.kk.kblog.entity.post;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -10,10 +12,13 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 import lombok.Data;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "posts")
 @Data
+// 只更新变化的列：AI 摘要由后台线程单独更新，避免普通保存把它覆盖回旧值
+@DynamicUpdate
 public class PostEntity {
 
     @Id
@@ -46,6 +51,20 @@ public class PostEntity {
 
     @Column(nullable = false)
     private boolean pinned;
+
+    /** 内容版本号：标题/正文每次变更 +1，AI 摘要按版本号条件写入，防止旧摘要覆盖 */
+    @Column(name = "content_version", columnDefinition = "bigint not null default 0")
+    private long contentVersion;
+
+    @Column(name = "ai_summary", columnDefinition = "TEXT")
+    private String aiSummary;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_summary_status", length = 16)
+    private AiSummaryStatus aiSummaryStatus;
+
+    @Column(name = "ai_summary_updated_at", columnDefinition = "datetime(3)")
+    private Instant aiSummaryUpdatedAt;
 
     protected PostEntity() {
     }
@@ -89,6 +108,15 @@ public class PostEntity {
         if (updatedAt == null) {
             updatedAt = now;
         }
+    }
+
+    /**
+     * 内容变更：版本号 +1，AI 摘要进入生成中（新建或标题/正文变更时调用）
+     */
+    public void bumpContentVersion() {
+        this.contentVersion++;
+        this.aiSummaryStatus = AiSummaryStatus.GENERATING;
+        this.aiSummaryUpdatedAt = Instant.now();
     }
 
     public void touchUpdatedAt() {

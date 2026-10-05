@@ -1,12 +1,9 @@
-name: Deploy to Server
+name: Deploy to Server (Docker)
 
-# 触发：push 到 dev 自动部署测试环境 k-blog-test；
-#       手动触发：在 main 上触发部署正式环境 k-blog，在 dev 上触发等效于自动部署。
+# 触发：仅手动触发（Actions 页面选择本 workflow 与分支）：
+#       dev 分支 → 测试环境 k-blog-test；main 分支 → 正式环境 k-blog。
 # rollback_tag 留空时正常构建部署；填写历史标签（如 k-blog-test-42）时跳过构建直接回滚。
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
     inputs:
       rollback_tag:

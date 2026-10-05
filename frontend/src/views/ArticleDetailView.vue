@@ -231,7 +231,8 @@ watch(() => props.isSidebarOpen, async () => {
           <div class="flex h-full gap-6 2xl:gap-8">
 
             <!-- 左侧：正文滚动区域 -->
-            <article class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
+            <!-- min-w-0 防止宽内容撑开 flex 子项；overflow-x-hidden 防止移动端滑动时正文左右晃动 -->
+            <article class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-x-none custom-scrollbar scroll-smooth">
               <div class="w-full max-w-3xl lg:max-w-4xl mx-auto py-6 pb-64">
 
                 <!-- 文章卡片 -->
@@ -266,6 +267,7 @@ watch(() => props.isSidebarOpen, async () => {
                   <AiSummaryCard
                       :postId="post.id"
                       :content="post.content"
+                      :aiSummaryStatus="post.aiSummaryStatus"
                       class="mb-12"
                   />
                 </div>
@@ -296,7 +298,8 @@ watch(() => props.isSidebarOpen, async () => {
             </article>
 
             <!-- 右侧：目录固定 -->
-            <aside class="hidden xl:block 2xl:w-48 shrink-0 py-6">
+            <!-- 右侧目录固定宽度，长标题在组件内换行 -->
+            <aside class="hidden xl:block w-56 shrink-0 py-6">
               <div class="sticky top-0 pt-8 md:pt-10 lg:pt-12 lg:pb-20">
                 <ArticleTOC
                     :headings="headings"

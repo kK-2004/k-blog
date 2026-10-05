@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
+import { useAiSummary } from '@/composables/useAiSummary'
+import type { AiSummaryStatus } from '@/api/types'
 
 const props = defineProps<{
   postId: number
   content: string
+  aiSummaryStatus?: AiSummaryStatus
 }>()
 
-const summary = ref('')
-const displayedSummary = ref('')
-const isGenerating = ref(false)
-const isStreaming = ref(false)
-const hasReceivedData = ref(false)
-let summaryRequestId = 0
+// 摘要由后端发布后异步生成落库；这里读取（Redis → 数据库）并以打字机效果展示
+const {
+  summary,
+  displayedSummary,
+  isGenerating,
+  isStreaming,
+  hasReceivedData,
+  isPending,
+  reveal: generateSummary,
+} = useAiSummary(() => props.postId, () => props.aiSummaryStatus)
 
 // 判断是否应该渲染 Markdown
 const shouldRenderMarkdown = computed(() => {
@@ -26,68 +33,6 @@ const renderedSummaryHtml = computed(() => {
   }
   return renderMarkdown(displayedSummary.value)
 })
-
-// 生成摘要
-const generateSummary = async () => {
-  if (isGenerating.value || summary.value) return
-
-  const requestId = (summaryRequestId += 1)
-  displayedSummary.value = ''
-  summary.value = ''
-  isGenerating.value = true
-  isStreaming.value = true
-  hasReceivedData.value = false
-
-  try {
-    const res = await fetch('/api/ai/summary/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: props.content }),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    if (!res.body) throw new Error('No response body')
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let acc = ''
-
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      if (requestId !== summaryRequestId) {
-        try {
-          await reader.cancel()
-        } catch {
-          // ignore
-        }
-        return
-      }
-
-      const chunk = decoder.decode(value, { stream: true })
-      if (!chunk) continue
-      acc += chunk
-      displayedSummary.value = acc
-      hasReceivedData.value = true
-    }
-
-    if (requestId !== summaryRequestId) return
-    const finalText = acc.trim() || '无法生成摘要'
-    displayedSummary.value = finalText
-    summary.value = finalText
-  } catch {
-    if (requestId !== summaryRequestId) return
-    await new Promise((r) => setTimeout(r, 1200))
-    summary.value =
-      '（演示模式：本地 /api/ai/summary/stream 不可用）\n这是一段模拟摘要。你可以把摘要服务替换成真实的 GLM / OpenAI 接口。'
-    displayedSummary.value = summary.value
-    hasReceivedData.value = true
-  } finally {
-    if (requestId === summaryRequestId) {
-      isGenerating.value = false
-      isStreaming.value = false
-    }
-  }
-}
 
 // 暴露方法供父组件调用
 defineExpose({
@@ -124,10 +69,13 @@ defineExpose({
         <button
           v-if="!summary && !isGenerating"
           @click="generateSummary"
-          class="text-xs bg-white dark:bg-white/10 px-4 py-2 rounded-full hover:scale-105 transition shadow-sm border border-gray-200 dark:border-white/10 flex items-center gap-1.5"
+          :disabled="isPending"
+          class="text-xs bg-white dark:bg-white/10 px-4 py-2 rounded-full transition shadow-sm border border-gray-200 dark:border-white/10 flex items-center gap-1.5"
+          :class="isPending ? 'opacity-60 cursor-not-allowed' : 'hover:scale-105'"
         >
-          <i class="ph-fill ph-sparkle text-purple-500"></i>
-          <span>生成摘要</span>
+          <i v-if="isPending" class="ph ph-circle-notch animate-spin text-purple-500"></i>
+          <i v-else class="ph-fill ph-sparkle text-purple-500"></i>
+          <span>{{ isPending ? '生成中' : '生成摘要' }}</span>
         </button>
       </div>
 
@@ -158,7 +106,7 @@ defineExpose({
 
         <!-- 初始提示 -->
         <div v-else class="text-gray-400 italic">
-          点击右上角按钮生成本文的智能摘要...
+          {{ isPending ? 'AI 正在为本文生成摘要，请稍候...' : '点击右上角按钮生成本文的智能摘要...' }}
         </div>
       </div>
 

@@ -1,0 +1,135 @@
+# k-blog 前后端一体 Deployment + Service + Ingress 模板（由 deploy-k3s.yml 使用）
+# 由 GitHub Action 用 envsubst 渲染：${APP_NAME} ${IMAGE} ${BUILD_NUMBER} ${HOST} ${RUN_ID}
+#   dev  → APP_NAME=k-blog-test，HOST=test-blog.ksite.xin
+#   main → APP_NAME=k-blog，     HOST=blog.ksite.xin
+# 对外访问：cloudflared tunnel → Traefik → Ingress（按 Host 路由）→ Service → Pod
+# 运行配置来自 Secret ${APP_NAME}-env（Action 中由 GitHub Secrets 生成）
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  namespace: default
+  labels:
+    app: ${APP_NAME}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+        build: "${BUILD_NUMBER}"
+      annotations:
+        # 每次 Action 运行都变化，保证 Secret 更新后 Pod 也会滚动重建
+        kblog/run-id: "${RUN_ID}"
+    spec:
+      # 只调度到 size=small 的节点上
+      nodeSelector:
+        size: small
+      # 节点宕机后 30 秒就迁移到别的 small 节点（默认要等 5 分钟）
+      tolerations:
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+      imagePullSecrets:
+        - name: acr-kk09
+      containers:
+        - name: app
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8087
+          envFrom:
+            - secretRef:
+                name: ${APP_NAME}-env
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: BUILD_NUMBER
+              value: "${BUILD_NUMBER}"
+            - name: TZ
+              value: Asia/Shanghai
+            - name: LOG_PATH
+              value: /app/logs
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # 存活探针只看端口，避免 MySQL/Redis 短暂不可用时被反复重启
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${APP_NAME}
+  namespace: default
+  labels:
+    app: ${APP_NAME}
+spec:
+  selector:
+    app: ${APP_NAME}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http                     # 容器端口 8087
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${APP_NAME}
+  namespace: default
+  labels:
+    app: ${APP_NAME}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: ${HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ${APP_NAME}
+                port:
+                  number: 80

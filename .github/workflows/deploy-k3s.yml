@@ -1,0 +1,259 @@
+name: Deploy to k3s
+
+# 前后端一体镜像（根目录 Dockerfile）部署到 k3s 集群；对外 cloudflared tunnel → Traefik → Ingress。
+# 触发：仅手动触发（Actions 页面选择本 workflow 与分支）：
+#       dev 分支 → 测试环境 k-blog-test；main 分支 → 正式环境 k-blog。
+# rollback_tag 留空时正常构建部署；填写历史标签（如 k3s-k-blog-test-42）时跳过构建直接回滚。
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_tag:
+        description: "可选：要回滚的 ACR 历史标签，如 k3s-k-blog-test-42；留空则正常构建部署"
+        required: false
+        default: ""
+        type: string
+
+# 同一分支同一时间只允许一个部署任务，避免并发互相覆盖
+concurrency:
+  group: deploy-k3s-kblog-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+      # 国内服务器才需要 Docker 镜像加速；secrets 为空则跳过此步骤
+      # 注意：if 条件求值时拿不到 step 级 env，必须经 job 级 env 中转
+      NEED_DOCKER_MIRROR: ${{ secrets.DOCKER_MIRROR_URL != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # 按分支区分部署上下文（k3s 集群 default 命名空间，Pod 调度到 size=small 节点）：
+      #   dev          → 测试环境：Deployment/Service/Ingress k-blog-test，域名 test-blog.ksite.xin
+      #   其它（main） → 正式环境：Deployment/Service/Ingress k-blog，域名 blog.ksite.xin
+      # 镜像标签带 k3s- 前缀，与 docker 部署方式（deploy.yml）的标签隔离（两个 workflow 构建号各自计数）
+      # MySQL/Redis 在集群外 Docker 主机 100.66.237.46 上，连接地址见 application-prod.yml；
+      # 数据库共用 k_blog 库（application-prod.yml 默认连接），不单独分测试库
+      - name: Set deployment context
+        id: ctx
+        run: |
+          BRANCH="${GITHUB_REF_NAME:-}"
+          if [[ "$BRANCH" == "dev" ]]; then
+            echo "app_name=k-blog-test" >> "$GITHUB_OUTPUT"
+            echo "host=test-blog.ksite.xin" >> "$GITHUB_OUTPUT"
+            echo "cors_origin=https://test-blog.ksite.xin" >> "$GITHUB_OUTPUT"
+            echo "Deploy context: branch=dev → k-blog-test / 库共用 k_blog / CORS test-blog.ksite.xin"
+          else
+            echo "app_name=k-blog" >> "$GITHUB_OUTPUT"
+            echo "host=blog.ksite.xin" >> "$GITHUB_OUTPUT"
+            echo "cors_origin=" >> "$GITHUB_OUTPUT"
+            echo "Deploy context: branch=$BRANCH → k-blog / 库共用 k_blog / CORS 用 yml 默认"
+          fi
+
+      # 国内 runner：配置 Docker 镜像加速（仅当配置了 DOCKER_MIRROR_URL）
+      - name: Configure Docker registry mirror
+        if: ${{ env.NEED_DOCKER_MIRROR == 'true' && (github.event_name != 'workflow_dispatch' || inputs.rollback_tag == '') }}
+        env:
+          DOCKER_MIRROR_URL: ${{ secrets.DOCKER_MIRROR_URL }}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /etc/docker
+          sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+          {
+            "registry-mirrors": ["$DOCKER_MIRROR_URL"],
+            "max-concurrent-downloads": 10,
+            "max-concurrent-uploads": 5
+          }
+          EOF
+          sudo systemctl restart docker
+          sleep 5
+          docker info | grep -A 5 "Registry Mirrors" || true
+
+      # 登录阿里云 ACR：Dockerfile 的基础镜像来自私有仓库 crpi-...aliyuncs.com/kk09，
+      # 缺少凭据会拉取失败。设置过则登录；未设置则在构建时给出明确报错。
+      - name: Login to Aliyun ACR
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.rollback_tag == '' }}
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${ACR_REGISTRY:?请在 GitHub Action secret 中设置 ACR_REGISTRY（如 crpi-g3stl1c9yrlh5x39.cn-beijing.personal.cr.aliyuncs.com）}"
+          : "${ACR_USERNAME:?请在 GitHub Action secret 中设置 ACR_USERNAME}"
+          : "${ACR_PASSWORD:?请在 GitHub Action secret 中设置 ACR_PASSWORD}"
+          echo "${ACR_PASSWORD}" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
+
+      # 构建前后端一体镜像（根目录 Dockerfile，上下文为仓库根）并推送到 ACR 仓库 kk09/kblog：
+      #   环境滚动标签 k3s-{APP_NAME}-latest + 构建号历史标签 k3s-{APP_NAME}-{run_number}
+      - name: Build and push Docker image
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.rollback_tag == '' }}
+        env:
+          APP_NAME: ${{ steps.ctx.outputs.app_name }}
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+        run: |
+          set -euo pipefail
+          : "${ACR_REGISTRY:?请在 GitHub Action secret 中设置 ACR_REGISTRY}"
+
+          ACR_IMAGE="${ACR_REGISTRY}/kk09/kblog"
+          ACR_BUILD_TAG="k3s-${APP_NAME}-${BUILD_NUMBER}"
+          ACR_LATEST_TAG="k3s-${APP_NAME}-latest"
+
+          echo "Building ${ACR_IMAGE}:${ACR_BUILD_TAG}"
+          docker build --progress=plain \
+            -t "${ACR_IMAGE}:${ACR_BUILD_TAG}" \
+            -t "${ACR_IMAGE}:${ACR_LATEST_TAG}" \
+            --build-arg MAVEN_PROFILE=prod \
+            --build-arg SKIP_TESTS=true \
+            --build-arg BUILD_NUMBER="${BUILD_NUMBER}" \
+            -f Dockerfile \
+            .
+          docker images "${ACR_IMAGE}"
+
+          echo "Pushing immutable build tag ${ACR_BUILD_TAG}..."
+          docker push "${ACR_IMAGE}:${ACR_BUILD_TAG}"
+          echo "Pushing rolling tag ${ACR_LATEST_TAG}..."
+          docker push "${ACR_IMAGE}:${ACR_LATEST_TAG}"
+          echo "Docker image published to Aliyun ACR"
+
+      - name: Set kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to k3s
+        env:
+          APP_NAME: ${{ steps.ctx.outputs.app_name }}
+          HOST: ${{ steps.ctx.outputs.host }}
+          RUN_ID: ${{ github.run_id }}
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          ROLLBACK_TAG: ${{ inputs.rollback_tag || '' }}
+          # 应用运行配置（全部来自 secrets，写入集群 Secret <APP_NAME>-env）
+          # 数据库凭据：用户名默认 kblog（未配 Secret 时）；密码必须配置 DB_PASSWORD
+          DB_USERNAME: ${{ secrets.DB_USERNAME || 'kblog' }}
+          # MySQL 主机/端口：配置了 DB_HOST / DB_PORT secret 才注入，否则用 application-prod.yml 默认（mysql:3306）
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'kK' }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          DDL_AUTO: ${{ secrets.DDL_AUTO || 'update' }}
+          # Redis 主机/端口以 application-prod.yml 为准；配置了同名 secret 才注入覆盖
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_DATABASE: ${{ secrets.REDIS_DATABASE || '0' }}
+          # 阿里云 OSS（默认关闭，与旧 deploy.sh 一致；启用时需配齐 AK/SK/endpoint/bucket）
+          ALI_OSS_ENABLED: ${{ secrets.ALI_OSS_ENABLED || 'false' }}
+          ALI_OSS_ENDPOINT: ${{ secrets.ALI_OSS_ENDPOINT }}
+          ALI_OSS_BUCKET: ${{ secrets.ALI_OSS_BUCKET }}
+          ALI_OSS_ACCESS_KEY_ID: ${{ secrets.ALI_OSS_ACCESS_KEY_ID }}
+          ALI_OSS_ACCESS_KEY_SECRET: ${{ secrets.ALI_OSS_ACCESS_KEY_SECRET }}
+          ALI_OSS_PUBLIC_BASE_URL: ${{ secrets.ALI_OSS_PUBLIC_BASE_URL }}
+          # AI 摘要（LLM，可选）
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          # CORS：dev 推送自动注入测试域名；正式环境为空，沿用 application-prod.yml 默认（blog.ksite.xin）
+          CORS_ORIGIN: ${{ steps.ctx.outputs.cors_origin }}
+        run: |
+          set -euo pipefail
+          : "${ACR_REGISTRY:?missing ACR_REGISTRY secret}"
+          : "${ACR_USERNAME:?missing ACR_USERNAME secret}"
+          : "${ACR_PASSWORD:?missing ACR_PASSWORD secret}"
+
+          ACR_IMAGE="${ACR_REGISTRY}/kk09/kblog"
+          if [[ -n "$ROLLBACK_TAG" ]]; then
+            if [[ ! "$ROLLBACK_TAG" =~ ^k3s-${APP_NAME}-[0-9]+$ ]]; then
+              echo "Invalid rollback_tag: $ROLLBACK_TAG" >&2
+              echo "Expected format: k3s-${APP_NAME}-<run_number>" >&2
+              exit 1
+            fi
+            ACR_BUILD_TAG="$ROLLBACK_TAG"
+            DEPLOY_BUILD_NUMBER="${ROLLBACK_TAG##*-}"
+            echo "Rollback mode: deploying ${ACR_IMAGE}:${ACR_BUILD_TAG} with current GitHub Secrets"
+          else
+            ACR_BUILD_TAG="k3s-${APP_NAME}-${BUILD_NUMBER}"
+            DEPLOY_BUILD_NUMBER="$BUILD_NUMBER"
+            echo "Normal deploy mode: deploying ${ACR_IMAGE}:${ACR_BUILD_TAG}"
+          fi
+
+          # 部署账号（ServiceAccount github-deployer）只有 default 命名空间权限，这里不查询集群级资源（如 nodes）
+          echo "=== [1/4] Check cluster ==="
+          kubectl version
+
+          # 镜像拉取凭据 + 运行配置 Secret（dry-run 生成后 apply，幂等更新）
+          echo "=== [2/4] Sync secrets ==="
+          kubectl -n default create secret docker-registry acr-kk09 \
+            --docker-server="$ACR_REGISTRY" \
+            --docker-username="$ACR_USERNAME" \
+            --docker-password="$ACR_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          ENV_FILE="$(mktemp)"
+          trap 'rm -f "$ENV_FILE"' EXIT
+          {
+            echo "SPRING_DATASOURCE_USERNAME=$DB_USERNAME"
+            echo "SPRING_DATASOURCE_PASSWORD=$DB_PASSWORD"
+            echo "DB_USERNAME=$DB_USERNAME"
+            echo "DB_PASSWORD=$DB_PASSWORD"
+            if [[ -n "$DB_HOST" ]]; then echo "DB_HOST=$DB_HOST"; fi
+            if [[ -n "$DB_PORT" ]]; then echo "DB_PORT=$DB_PORT"; fi
+            echo "DDL_AUTO=$DDL_AUTO"
+            if [[ -n "$REDIS_HOST" ]]; then echo "REDIS_HOST=$REDIS_HOST"; fi
+            if [[ -n "$REDIS_PORT" ]]; then echo "REDIS_PORT=$REDIS_PORT"; fi
+            echo "REDIS_PASSWORD=$REDIS_PASSWORD"
+            echo "REDIS_DATABASE=$REDIS_DATABASE"
+            echo "ALI_OSS_ENABLED=$ALI_OSS_ENABLED"
+            echo "ALI_OSS_ENDPOINT=$ALI_OSS_ENDPOINT"
+            echo "ALI_OSS_BUCKET=$ALI_OSS_BUCKET"
+            echo "ALI_OSS_ACCESS_KEY_ID=$ALI_OSS_ACCESS_KEY_ID"
+            echo "ALI_OSS_ACCESS_KEY_SECRET=$ALI_OSS_ACCESS_KEY_SECRET"
+            echo "ALI_OSS_PUBLIC_BASE_URL=$ALI_OSS_PUBLIC_BASE_URL"
+            echo "AI_API_KEY=$AI_API_KEY"
+            echo "ADMIN_USERNAME=$ADMIN_USERNAME"
+            echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+            # dev 注入测试域名 CORS（覆盖 app.cors.allowed-origins）；正式环境为空 → 用 yml 默认
+            if [[ -n "$CORS_ORIGIN" ]]; then
+              echo "APP_CORS_ALLOWED_ORIGINS=$CORS_ORIGIN"
+            fi
+          } > "$ENV_FILE"
+          kubectl -n default create secret generic "${APP_NAME}-env" \
+            --from-env-file="$ENV_FILE" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "=== [3/4] Apply Deployment/Service/Ingress ==="
+          export APP_NAME HOST RUN_ID
+          export IMAGE="${ACR_IMAGE}:${ACR_BUILD_TAG}"
+          export BUILD_NUMBER="$DEPLOY_BUILD_NUMBER"
+          envsubst '${APP_NAME} ${IMAGE} ${BUILD_NUMBER} ${HOST} ${RUN_ID}' \
+            < deploy/k8s/app.yaml | kubectl apply -f -
+
+          echo "=== [4/4] Wait for rollout ==="
+          if ! kubectl -n default rollout status "deployment/${APP_NAME}" --timeout=300s; then
+            echo "=== Rollout failed! ==="
+            kubectl -n default describe pods -l "app=${APP_NAME}" | tail -n 60 || true
+            kubectl -n default logs -l "app=${APP_NAME}" --tail=100 --all-containers --prefix || true
+            exit 1
+          fi
+
+          kubectl -n default get deploy,pods,svc,ingress -l "app=${APP_NAME}" -o wide
+          echo "=== App logs (last 20 lines) ==="
+          kubectl -n default logs "deployment/${APP_NAME}" --tail=20 || true
+          echo "=== Deployment completed ==="
+
+      - name: Logout from Aliyun ACR
+        if: always()
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+        run: |
+          if [[ -n "$ACR_REGISTRY" ]]; then
+            docker logout "$ACR_REGISTRY" || true
+          fi

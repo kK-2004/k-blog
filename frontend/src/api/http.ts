@@ -91,6 +91,8 @@ export async function apiFetch<T>(
       const isSilentError =
         // 登录状态检查接口的 401 错误（用户未登录是正常情况）
         (path === '/api/admin/me' && res.status === 401) ||
+        // AI 摘要状态后台轮询，失败时下次轮询重试即可
+        path.startsWith('/api/posts/ai-summary/status') ||
         // 其他需要静默的错误可以在这里添加
         false
 

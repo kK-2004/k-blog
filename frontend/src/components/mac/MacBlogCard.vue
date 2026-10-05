@@ -5,6 +5,7 @@ import { renderMarkdown } from '@/composables/useMarkdown'
 import { useReadStats } from '@/composables/useReadStats'
 import { useHashRouter } from '@/composables/useHashRouter'
 import { useMessage } from '@/composables/useMessage'
+import { useAiSummary } from '@/composables/useAiSummary'
 import AvatarCircle from './AvatarCircle.vue'
 import ImageLightbox from './ImageLightbox.vue'
 import { incrementLikes, incrementViews } from '@/api/posts'
@@ -123,12 +124,17 @@ const navigateToArticle = () => {
   router.navigateTo('article', { articleId: props.post.id })
 }
 
-const summary = ref('')
-const displayedSummary = ref('')
-const isGenerating = ref(false)
-const isStreamingSummary = ref(false)
-const hasReceivedSummaryData = ref(false) // 是否已收到流式响应数据
-let summaryRequestId = 0
+// AI 摘要：后端发布后异步生成落库，这里读取（Redis → 数据库）并以打字机效果展示
+const {
+  summary,
+  displayedSummary,
+  isGenerating,
+  isStreaming: isStreamingSummary,
+  hasReceivedData: hasReceivedSummaryData,
+  isPending: isSummaryPending,
+  reveal: revealAiSummary,
+  clear: clearAiSummary,
+} = useAiSummary(() => props.post.id, () => props.post.aiSummaryStatus)
 
 const geminiGradientId = computed(() => `gemini_grad_${props.post.id}`)
 
@@ -481,15 +487,9 @@ const collapse = () => {
   if (!isExpanded.value && !isVisuallyExpanded.value) return
   isVisuallyExpanded.value = false
   replyingTo.value = null
-  summaryRequestId += 1
-  isGenerating.value = false
   window.setTimeout(resetInnerScroll, 0)
   window.setTimeout(() => {
-    if (!isVisuallyExpanded.value) {
-      summary.value = ''
-      displayedSummary.value = ''
-      hasReceivedSummaryData.value = false // 重置数据接收状态
-    }
+    if (!isVisuallyExpanded.value) clearAiSummary()
   }, SUMMARY_COLLAPSE_MS)
   window.setTimeout(() => {
     if (!isVisuallyExpanded.value) isExpanded.value = false
@@ -679,69 +679,12 @@ const submitComment = async () => {
 }
 
 const generateAiSummary = async () => {
-  if (isGenerating.value || summary.value) return
+  if (isGenerating.value || summary.value || isSummaryPending.value) return
   if (!isVisuallyExpanded.value) {
     expand()
     await nextTick()
   }
-
-  const requestId = (summaryRequestId += 1)
-  displayedSummary.value = ''
-  summary.value = ''
-  isGenerating.value = true
-  isStreamingSummary.value = true
-  hasReceivedSummaryData.value = false // 重置：还未收到数据
-
-  try {
-    const res = await fetch('/api/ai/summary/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: props.post.content }),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    if (!res.body) throw new Error('No response body')
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let acc = ''
-
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      if (requestId !== summaryRequestId) {
-        try {
-          await reader.cancel()
-        } catch {
-          // ignore
-        }
-        return
-      }
-
-      const chunk = decoder.decode(value, { stream: true })
-      if (!chunk) continue
-      acc += chunk
-      displayedSummary.value = acc
-      hasReceivedSummaryData.value = true // 已收到数据
-      // 不要在这里设置 isGenerating = false，应该在整个流式输出完成后才设置
-    }
-
-    if (requestId !== summaryRequestId) return
-    const finalText = acc.trim() || '无法生成摘要'
-    displayedSummary.value = finalText
-    summary.value = finalText
-  } catch {
-    if (requestId !== summaryRequestId) return
-    await new Promise((r) => setTimeout(r, 1200))
-    summary.value =
-        '（演示模式：本地 /api/ai/summary/stream 不可用）\n这是一段模拟摘要。你可以把摘要服务替换成真实的 GLM / OpenAI 接口。'
-    displayedSummary.value = summary.value
-    hasReceivedSummaryData.value = true // 模拟数据也算收到数据
-  } finally {
-    if (requestId === summaryRequestId) {
-      isGenerating.value = false
-      isStreamingSummary.value = false
-    }
-  }
+  await revealAiSummary()
 }
 
 let autoCollapseRaf = 0
@@ -955,11 +898,14 @@ const closeCollapseHint = () => {
 
               <button
                   v-if="!summary && !isGenerating"
+                  :disabled="isSummaryPending"
+                  :class="isSummaryPending ? 'opacity-60 cursor-not-allowed' : ''"
                   class="text-xs flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-500/50 transition-all shadow-sm active:scale-95 group/btn"
                   @click="generateAiSummary"
               >
-                <i class="ph ph-sparkle text-purple-500 group-hover/btn:scale-110 transition-transform"></i>
-                <span>AI 摘要</span>
+                <i v-if="isSummaryPending" class="ph ph-circle-notch animate-spin text-purple-500"></i>
+                <i v-else class="ph ph-sparkle text-purple-500 group-hover/btn:scale-110 transition-transform"></i>
+                <span>{{ isSummaryPending ? '生成中' : 'AI 摘要' }}</span>
               </button>
             </div>
 

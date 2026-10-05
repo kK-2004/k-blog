@@ -178,7 +178,7 @@ const scrollToHeading = async (id: string) => {
 
 // 桌面端目录样式
 const getDesktopHeadingClass = (heading: Heading) => {
-  const baseClass = 'block text-sm py-1.5 transition-all duration-200 border-l-2 -ml-[21px] pl-[19px] cursor-pointer'
+  const baseClass = 'block text-sm leading-snug py-1.5 break-words transition-all duration-200 border-l-2 -ml-[21px] pl-[19px] cursor-pointer'
 
   if (props.activeId === heading.id) {
     return `${baseClass} text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400 font-medium`
@@ -286,7 +286,7 @@ watch(() => props.activeId, () => {
     </div>
 
     <!-- 桌面端目录（保持原有样式） -->
-    <nav class="article-toc hidden lg:block">
+    <nav class="article-toc hidden lg:block w-full">
       <div class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">
         目录
       </div>
@@ -311,9 +311,9 @@ watch(() => props.activeId, () => {
 
 <style scoped>
 .article-toc {
-  @apply max-w-xs;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: 80px; /* 底部额外空间，防止被评论框遮挡 */
 }
 

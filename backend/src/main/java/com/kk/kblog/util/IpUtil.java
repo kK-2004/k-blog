@@ -10,6 +10,13 @@ public class IpUtil {
     public static String getClientIp(HttpServletRequest request) {
         String ip;
 
+        // 0️⃣ CF-Connecting-IP：经 Cloudflare（含 cloudflared tunnel）进来的访客真实 IP，
+        //    中间的 Traefik 等代理不会改写它（X-Forwarded-For 会被不受信任的代理覆盖）
+        ip = request.getHeader("CF-Connecting-IP");
+        if (isValidIp(ip)) {
+            return ip.trim();
+        }
+
         // 1️⃣ X-Forwarded-For（最常见）
         ip = request.getHeader("X-Forwarded-For");
         if (isValidIp(ip)) {

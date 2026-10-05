@@ -10,6 +10,7 @@ public record PostDto(
         int views,
         int likes,
         int comments,
-        boolean pinned
+        boolean pinned,
+        String aiSummaryStatus
 ) {
 }

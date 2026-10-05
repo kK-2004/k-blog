@@ -4,6 +4,7 @@ import com.kk.kblog.dto.post.PostDto;
 import com.kk.kblog.dto.post.PostRequests.CreatePostRequest;
 import com.kk.kblog.dto.post.PostRequests.PatchPostRequest;
 import com.kk.kblog.dto.post.PostRequests.UpdatePostRequest;
+import com.kk.kblog.entity.post.AiSummaryStatus;
 import com.kk.kblog.entity.post.PostEntity;
 import com.kk.kblog.repository.post.PostRepository;
 import com.kk.kblog.repository.post.PostStatsJdbcRepository;
@@ -12,6 +13,7 @@ import jakarta.persistence.EntityNotFoundException;
 import java.util.HashMap;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -29,12 +31,15 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostStatsJdbcRepository postStatsJdbcRepository;
     private final AdminUserRepository adminUserRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final Sort defaultSort = Sort.by(Sort.Order.desc("pinned"), Sort.Order.desc("id"));
 
-    public PostService(PostRepository postRepository, PostStatsJdbcRepository postStatsJdbcRepository, AdminUserRepository adminUserRepository) {
+    public PostService(PostRepository postRepository, PostStatsJdbcRepository postStatsJdbcRepository,
+                       AdminUserRepository adminUserRepository, ApplicationEventPublisher eventPublisher) {
         this.postRepository = postRepository;
         this.postStatsJdbcRepository = postStatsJdbcRepository;
         this.adminUserRepository = adminUserRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +75,9 @@ public class PostService {
                 request.comments() == null ? 0 : request.comments(),
                 request.pinned() != null && request.pinned()
         );
+        post.bumpContentVersion();
         var saved = postRepository.save(post);
+        eventPublisher.publishEvent(new PostContentChangedEvent(saved.getId(), saved.getContentVersion()));
         log.info("post_created id={} authorId={} title={} pinned={}", saved.getId(), saved.getAuthorId(), saved.getTitle(), saved.isPinned());
         return toDto(saved, preloadAuthorNames(List.of(saved)));
     }
@@ -88,6 +95,10 @@ public class PostService {
         post.setPinned(request.pinned());
         if (contentChanged) {
             post.touchUpdatedAt();
+            post.bumpContentVersion();
+            // 状态列显式写入：@DynamicUpdate 下若加载时已是 GENERATING 则不会写列，可能残留旧任务刚写入的 READY
+            postRepository.updateAiSummaryStatus(id, AiSummaryStatus.GENERATING, post.getAiSummaryUpdatedAt());
+            eventPublisher.publishEvent(new PostContentChangedEvent(id, post.getContentVersion()));
         }
         return toDto(post, preloadAuthorNames(List.of(post)));
     }
@@ -110,6 +121,10 @@ public class PostService {
         if (request.pinned() != null) post.setPinned(request.pinned());
         if (contentChanged) {
             post.touchUpdatedAt();
+            post.bumpContentVersion();
+            // 状态列显式写入：@DynamicUpdate 下若加载时已是 GENERATING 则不会写列，可能残留旧任务刚写入的 READY
+            postRepository.updateAiSummaryStatus(id, AiSummaryStatus.GENERATING, post.getAiSummaryUpdatedAt());
+            eventPublisher.publishEvent(new PostContentChangedEvent(id, post.getContentVersion()));
         }
         return toDto(post, preloadAuthorNames(List.of(post)));
     }
@@ -120,6 +135,7 @@ public class PostService {
             throw new EntityNotFoundException("post not found: " + id);
         }
         postRepository.deleteById(id);
+        eventPublisher.publishEvent(new PostDeletedEvent(id));
     }
 
     @Transactional
@@ -163,7 +179,9 @@ public class PostService {
                 post.getViews(),
                 post.getLikes(),
                 post.getComments(),
-                post.isPinned()
+                post.isPinned(),
+                // 历史文章尚无状态：启动时会自动补生成，按生成中处理
+                (post.getAiSummaryStatus() == null ? AiSummaryStatus.GENERATING : post.getAiSummaryStatus()).name()
         );
     }
 
