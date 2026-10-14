@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -93,6 +94,25 @@ public class PostAiSummaryService {
             return new AiSummaryView(postId, status, post.getAiSummary());
         }
         return new AiSummaryView(postId, status, null);
+    }
+
+    /**
+     * 手动重试：把文章摘要置为生成中并重新入队，返回重试后的状态
+     * <p>
+     * 生成中或已生成成功的文章直接返回当前状态，不重复提交，避免排队任务被反复插入
+     */
+    @Transactional
+    public AiSummaryView retry(long postId) {
+        var post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("post not found: " + postId));
+
+        if (0 == postRepository.tryMarkAiSummaryGenerating(postId, Instant.now())) {
+            var current = post.getAiSummaryStatus();
+            return new AiSummaryView(postId, current == AiSummaryStatus.READY ? current : AiSummaryStatus.GENERATING, null);
+        }
+        log.info("ai_summary_retry postId={} version={}", postId, post.getContentVersion());
+        submit(postId, post.getContentVersion());
+        return new AiSummaryView(postId, AiSummaryStatus.GENERATING, null);
     }
 
     /**

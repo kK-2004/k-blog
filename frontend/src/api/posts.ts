@@ -56,3 +56,8 @@ export async function getAiSummaryStatuses(ids: number[]): Promise<AiSummary[]> 
   const params = new URLSearchParams({ ids: ids.join(',') })
   return apiFetch<AiSummary[]>(`/api/posts/ai-summary/status?${params.toString()}`, {}, { cache: false })
 }
+
+/** 手动重新生成 AI 摘要（仅失败/未生成的文章会真正重新入队），返回最新状态 */
+export async function retryAiSummary(id: number): Promise<AiSummary> {
+  return apiFetch<AiSummary>(`/api/posts/${id}/ai-summary/retry`, { method: 'POST' }, { cache: false })
+}

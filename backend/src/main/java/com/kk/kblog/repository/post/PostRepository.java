@@ -42,4 +42,15 @@ public interface PostRepository extends JpaRepository<PostEntity, Long> {
     @Query("select p.id as id, p.contentVersion as contentVersion from PostEntity p where p.aiSummaryStatus is null "
             + "or p.aiSummaryStatus <> com.kk.kblog.entity.post.AiSummaryStatus.READY order by p.id desc")
     List<PostVersion> findNeedingAiSummary();
+
+    /**
+     * 抢占式置为生成中：仅当当前不是生成中/已成功时才更新，返回 1 表示抢到，0 表示被别人抢先或无需重试
+     */
+    @Transactional
+    @Modifying
+    @Query("update PostEntity p set p.aiSummaryStatus = com.kk.kblog.entity.post.AiSummaryStatus.GENERATING, "
+            + "p.aiSummaryUpdatedAt = :now where p.id = :id and (p.aiSummaryStatus is null "
+            + "or p.aiSummaryStatus not in (com.kk.kblog.entity.post.AiSummaryStatus.GENERATING, "
+            + "com.kk.kblog.entity.post.AiSummaryStatus.READY))")
+    int tryMarkAiSummaryGenerating(@Param("id") long id, @Param("now") Instant now);
 }

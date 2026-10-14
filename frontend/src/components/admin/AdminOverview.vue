@@ -13,17 +13,28 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'create'): void
   (e: 'edit', post: Post): void
+  (e: 'open-summary-failed'): void
 }>()
 
 const quickActions = ref<QuickAction[]>([])
 
 const sum = (key: 'views' | 'likes' | 'comments') => props.posts.reduce((total, p) => total + (p[key] ?? 0), 0)
 
+const summaryFailedCount = computed(
+  () => props.posts.filter((p) => p.aiSummaryStatus === 'FAILED').length,
+)
+
 const stats = computed(() => [
   { label: '文章', value: formatCount(props.posts.length), icon: 'ph-article' },
   { label: '阅读', value: formatCount(sum('views')), icon: 'ph-eye' },
   { label: '点赞', value: formatCount(sum('likes')), icon: 'ph-heart' },
   { label: '评论', value: formatCount(sum('comments')), icon: 'ph-chat-circle' },
+  {
+    label: 'AI 摘要失败',
+    value: formatCount(summaryFailedCount.value),
+    icon: 'ph-warning-circle',
+    danger: summaryFailedCount.value > 0,
+  },
 ])
 
 const recentPosts = computed(() => [...props.posts].sort((a, b) => postTime(b) - postTime(a)).slice(0, 5))
@@ -69,20 +80,26 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <button
         v-for="item in stats"
         :key="item.label"
-        class="bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-sm border border-black/5 dark:border-white/10 px-4 py-3.5"
+        class="text-left bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-2xl rounded-xl shadow-sm border border-black/5 dark:border-white/10 px-4 py-3.5 transition-colors"
+        :class="item.danger ? 'hover:border-red-300 dark:hover:border-red-500/40' : 'cursor-default'"
+        :disabled="!item.danger"
+        @click="item.danger && emit('open-summary-failed')"
       >
         <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          <i :class="['ph', item.icon]"></i>
+          <i :class="['ph', item.icon, item.danger && !loading ? 'text-red-500' : '']"></i>
           {{ item.label }}
         </div>
-        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+        <div
+          class="mt-1 text-2xl font-semibold tabular-nums"
+          :class="item.danger && !loading ? 'text-red-500' : 'text-gray-900 dark:text-gray-100'"
+        >
           {{ loading ? '–' : item.value }}
         </div>
-      </div>
+      </button>
     </div>
 
     <div

@@ -112,6 +112,14 @@ public class PostController {
     }
 
     /**
+     * 手动重新生成 AI 摘要（后台管理用），仅对失败或尚未生成的文章生效
+     */
+    @PostMapping("/{id}/ai-summary/retry")
+    public AiSummaryView retryAiSummary(@PathVariable long id) {
+        return postAiSummaryService.retry(id);
+    }
+
+    /**
      * 获取热门文章榜单
      * 返回最近时间窗口内访问过的文章，按最近访问时间排序
      */

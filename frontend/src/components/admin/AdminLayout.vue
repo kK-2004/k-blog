@@ -26,17 +26,40 @@ const navItems: { id: AdminPage; label: string; icon: string }[] = [
 const posts = ref<Post[]>([])
 const loading = ref(true)
 const loadError = ref(false)
+const postsPanelRef = ref<InstanceType<typeof AdminPosts> | null>(null)
 
 const loadPosts = async () => {
   loadError.value = false
   try {
     posts.value = await listPosts({ cache: false })
+    postsPanelRef.value?.clearOverrides()
   } catch {
     loadError.value = true
   } finally {
     loading.value = false
   }
 }
+
+let summaryPollTimer: ReturnType<typeof setTimeout> | null = null
+
+// 有 AI 摘要仍在生成时定期刷新列表，直到状态变为 READY/FAILED
+const onSummaryStatusChange = (post: Post, status: Post['aiSummaryStatus']) => {
+  postsPanelRef.value?.onPostStatusChange(post, status)
+  if (summaryPollTimer) {
+    clearTimeout(summaryPollTimer)
+    summaryPollTimer = null
+  }
+  if (status === 'GENERATING') {
+    summaryPollTimer = setTimeout(() => {
+      summaryPollTimer = null
+      void loadPosts()
+    }, 6000)
+  }
+}
+
+onUnmounted(() => {
+  if (summaryPollTimer) clearTimeout(summaryPollTimer)
+})
 
 const retryLoad = () => {
   loading.value = true
@@ -205,15 +228,19 @@ onUnmounted(() => {
           :adminMe="adminMe"
           @create="openCreate"
           @edit="openEdit"
+          @open-summary-failed="navigateTo('admin', { adminPage: 'posts' })"
         />
         <AdminPosts
           v-else-if="adminPage === 'posts'"
+          ref="postsPanelRef"
           :posts="posts"
           :loading="loading"
           @create="openCreate"
           @edit="openEdit"
           @toggle-pin="togglePin"
           @delete="removePost"
+          @refresh="loadPosts"
+          @summary-status-change="onSummaryStatusChange"
         />
         <ProfileCenter v-else-if="adminPage === 'profile'" />
         <SettingsView v-else />

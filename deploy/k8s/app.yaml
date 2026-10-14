@@ -20,9 +20,10 @@ spec:
       app: ${APP_NAME}
   strategy:
     type: RollingUpdate
+    # small 节点只有 2G 内存，先停旧 Pod 再起新 Pod，避免两个 JVM 同时挤在一台机器上把节点拖死
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -35,16 +36,7 @@ spec:
       # 只调度到 size=small 的节点上
       nodeSelector:
         size: small
-      # 节点宕机后 30 秒就迁移到别的 small 节点（默认要等 5 分钟）
-      tolerations:
-        - key: node.kubernetes.io/unreachable
-          operator: Exists
-          effect: NoExecute
-          tolerationSeconds: 30
-        - key: node.kubernetes.io/not-ready
-          operator: Exists
-          effect: NoExecute
-          tolerationSeconds: 30
+      # 不再自定义 30 秒驱逐：跨云网络抖动或节点卡顿时会把 Pod 连环驱逐到下一台节点，用默认 300 秒
       imagePullSecrets:
         - name: acr-kk09
       containers:
@@ -66,12 +58,16 @@ spec:
               value: Asia/Shanghai
             - name: LOG_PATH
               value: /app/logs
+            # 覆盖 Dockerfile 默认的 -Xmx1024m：堆 + 堆外需控制在 limit 内，2C2G 节点还要留给系统和 MySQL
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Xss512k -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+          # request = limit：调度器按真实占用判断节点能否装下，装不下就 Pending，而不是压垮节点
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              memory: 768Mi
             limits:
-              memory: 1536Mi
+              memory: 768Mi
           startupProbe:
             httpGet:
               path: /actuator/health
