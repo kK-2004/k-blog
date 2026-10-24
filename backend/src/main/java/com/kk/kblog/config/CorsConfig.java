@@ -3,12 +3,14 @@ package com.kk.kblog.config;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-public class CorsConfig implements WebMvcConfigurer {
+public class CorsConfig {
 
     private final List<String> allowedOrigins;
 
@@ -19,18 +21,22 @@ public class CorsConfig implements WebMvcConfigurer {
                 .toList();
     }
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        var config = registry.addMapping("/api/**")
-                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true);
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        var config = new CorsConfiguration();
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
         if (allowedOrigins.isEmpty()) {
-            config.allowedOriginPatterns("*");
+            config.setAllowedOriginPatterns(List.of("*"));
         } else {
-            config.allowedOrigins(allowedOrigins.toArray(String[]::new));
+            config.setAllowedOrigins(allowedOrigins);
         }
+
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return source;
     }
 }
-

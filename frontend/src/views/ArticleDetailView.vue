@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { getPost, incrementLikes, incrementViews } from '@/api/posts'
+import { getPost, incrementLikes } from '@/api/posts'
 import { useReadStats } from '@/composables/useReadStats'
 import { useScrollProgress } from '@/composables/useScrollProgress'
 import type { Post, AdminMe } from '@/api/types'
@@ -16,6 +16,7 @@ import AiSummaryCard from '@/components/article/AiSummaryCard.vue'
 import CommentSection from '@/components/comment/CommentSection.vue'
 import FirstVisitGuide from '@/components/article/FirstVisitGuide.vue'
 import ArticleNotFound from '@/components/article/ArticleNotFound.vue'
+import ArticleSkeleton from '@/components/article/ArticleSkeleton.vue'
 
 // Props
 const props = defineProps<{
@@ -79,9 +80,6 @@ const fetchPost = async () => {
     post.value = data
     localLikes.value = data.likes
     hasLiked.value = false
-
-    // 增加浏览量
-    await incrementViews(props.postId)
   } catch (e) {
     console.error('获取文章失败:', e)
     error.value = true
@@ -200,8 +198,7 @@ watch(() => props.isSidebarOpen, async () => {
 <template>
   <div class="h-[100dvh] overflow-hidden bg-[#f5f5f700] dark:bg-[#12121200] transition-colors duration-300 font-sans selection:bg-blue-100 selection:text-blue-900">
 
-    <div v-if="loading" class="fixed inset-0 pt-32 flex items-start justify-center">
-    </div>
+    <ArticleSkeleton v-if="loading" :isSidebarOpen="isSidebarOpen" />
     <ArticleNotFound v-else-if="error || !post" />
 
     <template v-else>

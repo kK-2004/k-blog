@@ -54,7 +54,8 @@ public class PostController {
     public PostDto get(@PathVariable long id) {
         // 异步记录文章访问（不阻塞响应）
         CompletableFuture.runAsync(() -> hotPostsService.recordPostView(id));
-        return postService.getPost(id);
+        // 详情页读取即计一次浏览，省掉前端单独调用 /views
+        return postService.viewPost(id);
     }
 
     @PostMapping
@@ -80,13 +81,15 @@ public class PostController {
     }
 
     @PostMapping("/{id}/views")
-    public PostDto incrementViews(@PathVariable long id) {
-        return postService.incrementViews(id);
+    public ResponseEntity<Void> incrementViews(@PathVariable long id) {
+        postService.incrementViews(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/likes")
-    public PostDto incrementLikes(@PathVariable long id) {
-        return postService.incrementLikes(id);
+    public ResponseEntity<Void> incrementLikes(@PathVariable long id) {
+        postService.incrementLikes(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/comments/increment")

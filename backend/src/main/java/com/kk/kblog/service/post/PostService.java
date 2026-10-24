@@ -58,6 +58,18 @@ public class PostService {
         return posts.stream().map(p -> toDto(p, authorNameById)).toList();
     }
 
+    /**
+     * 文章详情页读取：先原子 +1 浏览量再查询，返回值已包含本次浏览
+     */
+    @Transactional
+    public PostDto viewPost(long id) {
+        var updated = postStatsJdbcRepository.incrementViews(id);
+        if (updated == 0) {
+            throw new EntityNotFoundException("post not found: " + id);
+        }
+        return getPost(id);
+    }
+
     @Transactional(readOnly = true)
     public PostDto getPost(long id) {
         var post = postRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("post not found: " + id));
@@ -139,22 +151,20 @@ public class PostService {
     }
 
     @Transactional
-    public PostDto incrementViews(long id) {
+    public void incrementViews(long id) {
         var updated = postStatsJdbcRepository.incrementViews(id);
         if (updated == 0) {
             throw new EntityNotFoundException("post not found: " + id);
         }
-        return getPost(id);
     }
 
     @Transactional
-    public PostDto incrementLikes(long id) {
+    public void incrementLikes(long id) {
         var updated = postStatsJdbcRepository.incrementLikes(id);
         if (updated == 0) {
             throw new EntityNotFoundException("post not found: " + id);
         }
         log.info("post_like_incremented id={}", id);
-        return getPost(id);
     }
 
     @Transactional

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { listPostsPage } from '@/api/posts'
-import type { Post, AdminMe } from '@/api/types'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import type { AdminMe } from '@/api/types'
 import MacBlogCard from '@/components/mac/MacBlogCard.vue'
+import { PAGE_SIZE, useBlogFeed } from '@/composables/useBlogFeed'
 
 const props = defineProps<{
   isAuthenticated: boolean
@@ -11,38 +11,31 @@ const props = defineProps<{
   scrollContainer: HTMLElement | null
 }>()
 
-const posts = ref<Post[]>([])
-const page = ref(0)
-const hasMore = ref(true)
-const loading = ref(false)
-const loadError = ref(false)
+const {
+  posts, hasMore, loading, loadError, newCount, hasCache,
+  loadMore, checkForNew, applyNew, saveScroll, restoreScroll,
+} = useBlogFeed()
+
 const sentinelRef = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
-const PAGE_SIZE = 5
+// 一页全是新文章时，实际可能更多
+const newCountLabel = computed(() => (newCount.value >= PAGE_SIZE ? `${PAGE_SIZE}+` : String(newCount.value)))
 
-const loadMore = async () => {
-  if (loading.value || !hasMore.value) return
-  loading.value = true
-  loadError.value = false
-  try {
-    const data = await listPostsPage(page.value, PAGE_SIZE)
-    posts.value.push(...data)
-    if (data.length < PAGE_SIZE) {
-      hasMore.value = false
-    } else {
-      page.value += 1
-    }
-  } catch (e) {
-    console.error('加载文章失败:', e)
-    loadError.value = true
-  } finally {
-    loading.value = false
-  }
+const onClickNew = () => {
+  applyNew()
+  props.scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 onMounted(async () => {
-  await loadMore()
+  if (hasCache.value) {
+    // 返回首页：先展示缓存并恢复滚动位置，后台检查是否有新文章
+    await nextTick()
+    restoreScroll(props.scrollContainer)
+    void checkForNew()
+  } else {
+    await loadMore()
+  }
   observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
@@ -55,6 +48,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  saveScroll(props.scrollContainer)
   observer?.disconnect()
   observer = null
 })
@@ -62,6 +56,23 @@ onBeforeUnmount(() => {
 
   <template>
   <div class="animate-[slideIn_0.5s_ease-out]">
+    <!-- 新文章胶囊提示：高度为 0 的 sticky 容器，不占位、不推动列表 -->
+    <div class="sticky top-3 z-30 h-0 flex items-start justify-center pointer-events-none">
+      <Transition name="capsule">
+        <button
+            v-if="newCount > 0"
+            type="button"
+            class="pointer-events-auto flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium text-white bg-blue-500/90 dark:bg-blue-500/80 backdrop-blur-md shadow-lg shadow-blue-500/25 hover:bg-blue-500 active:scale-95 transition-[background-color,transform]"
+            @click="onClickNew"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+          有 {{ newCountLabel }} 篇新的博客
+        </button>
+      </Transition>
+    </div>
+
     <!-- 文章列表 -->
     <div class="px-0 pb-4 pt-4">
       <MacBlogCard
@@ -97,3 +108,15 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.capsule-enter-active,
+.capsule-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.capsule-enter-from,
+.capsule-leave-to {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.9);
+}
+</style>

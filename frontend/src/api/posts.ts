@@ -11,9 +11,9 @@ export async function listPosts(options?: { cache?: boolean }): Promise<Post[]> 
   return apiFetch<Post[]>('/api/posts', {}, options)
 }
 
-export async function listPostsPage(page: number, size = 5): Promise<Post[]> {
+export async function listPostsPage(page: number, size = 5, options?: { cache?: boolean }): Promise<Post[]> {
   const params = new URLSearchParams({ page: String(page), size: String(size) })
-  return apiFetch<Post[]>(`/api/posts?${params.toString()}`)
+  return apiFetch<Post[]>(`/api/posts?${params.toString()}`, {}, options)
 }
 
 export async function getPost(id: number): Promise<Post> {
@@ -32,12 +32,12 @@ export async function deletePost(id: number): Promise<void> {
   return apiFetch<void>(`/api/posts/${id}`, { method: 'DELETE' })
 }
 
-export async function incrementViews(id: number): Promise<Post> {
-  return apiFetch<Post>(`/api/posts/${id}/views`, { method: 'POST' })
+export async function incrementViews(id: number): Promise<void> {
+  return apiFetch<void>(`/api/posts/${id}/views`, { method: 'POST' })
 }
 
-export async function incrementLikes(id: number): Promise<Post> {
-  return apiFetch<Post>(`/api/posts/${id}/likes`, { method: 'POST' })
+export async function incrementLikes(id: number): Promise<void> {
+  return apiFetch<void>(`/api/posts/${id}/likes`, { method: 'POST' })
 }
 
 export async function incrementComments(id: number): Promise<Post> {
