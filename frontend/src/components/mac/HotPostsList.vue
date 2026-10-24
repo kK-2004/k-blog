@@ -87,7 +87,7 @@ const formatTime = (lastViewTime: number): string => {
             <i class="ph-fill ph-medal text-lg"></i>
           </span>
           <span v-else-if="index === 2" class="text-amber-600">
-            <i class="ph-fill ph-award text-lg"></i>
+            <i class="ph-fill ph-medal text-lg"></i>
           </span>
           <span v-else class="text-xs font-medium text-gray-400">
             {{ index + 1 }}

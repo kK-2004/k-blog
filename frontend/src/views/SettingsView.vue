@@ -58,7 +58,7 @@ const ICON_PRESETS = [
   'ph-magnifying-glass',
   'ph-link',
   'ph-browser',
-  'ph-external-link',
+  'ph-arrow-square-out',
   'ph-upload-simple',
   'ph-download-simple',
   'ph-chart-bar',
